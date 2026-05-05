@@ -45,41 +45,28 @@
   input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 
   /* Layout */
-  .app { max-width: 680px; margin: 0 auto; padding: 14px 14px calc(80px + env(safe-area-inset-bottom)); }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 14px; }
-  header h1 {
-    margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-strong);
-    display: inline-flex; align-items: center; gap: 10px;
+  .app {
+    max-width: 680px; margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 12px) 14px calc(72px + env(safe-area-inset-bottom));
   }
-  header h1::before {
-    content: ''; width: 26px; height: 26px; border-radius: 7px;
-    background:
-      radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35) 0%, transparent 50%),
-      linear-gradient(135deg, #5e6ad2 0%, #8b5cf6 60%, #ec4899 100%);
-    box-shadow: 0 0 14px rgba(94,106,210,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
-  }
-  .header-actions { display: flex; gap: 6px; }
-  .icon-btn { width: 36px; height: 36px; border-radius: 8px; background: transparent;
-    display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
-    border: 1px solid transparent; transition: background .15s, color .15s; }
-  .icon-btn:hover { background: var(--surface); color: var(--text); }
+  header, .header-actions, .icon-btn { display: none !important; }
 
-  /* Bottom navigation tabs */
+  /* Bottom navigation — icons only */
   .tabs {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
-    display: flex; gap: 0;
-    background: rgba(15,17,20,0.85);
+    display: flex;
+    background: rgba(15,17,20,0.92);
     backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border-top: 1px solid var(--border-strong);
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   }
   .tab {
-    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 4px; padding: 8px 4px; border-radius: 10px;
-    color: var(--muted-2); font-size: 11px; font-weight: 500; letter-spacing: -0.005em;
-    position: relative; transition: color .15s, background .15s;
+    flex: 1; display: inline-flex; align-items: center; justify-content: center;
+    padding: 12px 4px; border-radius: 10px;
+    color: var(--muted-2);
+    transition: color .15s, background .15s;
   }
-  .tab svg { width: 22px; height: 22px; stroke-width: 1.8; }
+  .tab svg { width: 24px; height: 24px; stroke-width: 1.8; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--text-strong); }
   .tab.active svg { stroke-width: 2.2; }
@@ -89,9 +76,9 @@
     position: relative;
     background: linear-gradient(180deg, var(--surface) 0%, #0f1117 100%);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 12px 14px;
-    margin-bottom: 12px;
+    border-radius: 16px;
+    padding: 18px 18px;
+    margin-bottom: 14px;
     overflow: hidden;
     transition: border-color .3s ease, box-shadow .3s ease;
   }
@@ -106,7 +93,7 @@
     transition: background .25s, box-shadow .25s;
   }
   .now-name {
-    font-weight: 600; font-size: 16px; letter-spacing: -0.015em;
+    font-weight: 600; font-size: 19px; letter-spacing: -0.02em;
     flex: 1; min-width: 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
@@ -115,8 +102,8 @@
     font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     font-variant-numeric: tabular-nums;
     font-weight: 400;
-    font-size: 30px;
-    letter-spacing: -0.04em;
+    font-size: 38px;
+    letter-spacing: -0.05em;
     line-height: 1;
     color: var(--text);
     flex: none;
@@ -178,20 +165,20 @@
     50%     { box-shadow: 0 0 0 3px rgba(239,68,68,0.3), 0 16px 40px -12px rgba(239,68,68,0.75); }
   }
 
-  /* Categories — 2-col grid, big bold names */
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* Categories — 2-col grid, name only, big bold */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .cat {
     position: relative;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 14px 14px 14px 18px;
-    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 18px 14px 18px 22px;
+    display: flex; align-items: center;
     text-align: left;
     color: var(--text);
     transition: background .15s, border-color .15s, transform .08s;
     overflow: hidden;
-    min-height: 76px;
+    min-height: 78px;
   }
   .cat::before {
     content: ''; position: absolute;
@@ -202,27 +189,21 @@
   }
   .cat:hover { background: var(--surface-2); border-color: var(--border-strong); }
   .cat:active { transform: scale(0.99); }
-  .cat-text { flex: 1; min-width: 0; display: flex; align-items: center; }
   .cat-name {
-    font-size: 17px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-strong);
-    line-height: 1.15;
+    font-size: 20px; font-weight: 600; letter-spacing: -0.025em; color: var(--text-strong);
+    line-height: 1.1;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  }
-  .cat-time {
-    font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 500;
-    color: var(--muted); letter-spacing: -0.01em; margin-top: 6px;
-    font-feature-settings: "tnum";
+    flex: 1;
   }
   .cat.active {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--c) 18%, var(--surface)) 0%, var(--surface) 75%);
-    border-color: color-mix(in srgb, var(--c) 45%, var(--border-strong));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--c) 22%, var(--surface)) 0%, var(--surface) 75%);
+    border-color: color-mix(in srgb, var(--c) 50%, var(--border-strong));
   }
   .cat.active::before {
     top: 10px; bottom: 10px;
     box-shadow: 0 0 14px var(--c), 0 0 4px var(--c);
   }
   .cat.active .cat-name { color: #fff; }
-  .cat.active .cat-time { color: color-mix(in srgb, var(--c) 70%, white 30%); font-weight: 600; }
 
   /* Section title */
   .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase;
@@ -256,12 +237,9 @@
   .stats-bar > div { height: 100%; border-radius: 2px; }
   .stats-empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 13px; }
 
-  /* Timeline — 24h, Linear-style */
-  .timeline-card { background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 18px; margin-top: 18px; }
-  .timeline-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
-  .timeline-head .title { font-size: 13px; font-weight: 600; color: var(--text-strong); letter-spacing: -0.01em; }
-  .timeline-head .total { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  /* Timeline — 24h, top of screen, no card chrome */
+  .timeline-card { padding: 0; margin: 0 0 14px; background: transparent; border: 0; }
+  .timeline-head, .timeline-legend { display: none; }
   .timeline-track {
     position: relative;
     height: 32px;
@@ -407,17 +385,13 @@
 </div>
 
 <div class="app hidden" id="app">
-  <header>
-    <h1>Tracker</h1>
-    <div class="header-actions">
-      <button class="icon-btn" title="Настройки" onclick="openSettings()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
-    </div>
-  </header>
-
   <!-- TRACK TAB -->
   <section id="tab-track">
+    <div class="timeline-card">
+      <div class="timeline-track" id="timeline-track"></div>
+      <div class="timeline-axis" id="timeline-axis"></div>
+    </div>
+
     <div id="now" class="now idle" role="button" tabindex="0"
          onclick="stopActive()"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();stopActive();}">
@@ -431,15 +405,8 @@
 
     <div class="grid" id="cat-grid"></div>
 
-    <div class="timeline-card">
-      <div class="timeline-head">
-        <div class="title">Сегодня</div>
-        <div class="total" id="timeline-total">—</div>
-      </div>
-      <div class="timeline-track" id="timeline-track"></div>
-      <div class="timeline-axis" id="timeline-axis"></div>
-      <div class="timeline-legend" id="timeline-legend"></div>
-      <div id="today-stats-list" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);"></div>
+    <div class="stats" style="margin-top: 14px;">
+      <div id="today-stats-list"></div>
     </div>
   </section>
 
@@ -464,15 +431,15 @@
   <nav class="tabs" role="tablist">
     <button class="tab active" data-tab="track" onclick="switchTab('track')" aria-label="Трекер">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      <span>Трекер</span>
     </button>
     <button class="tab" data-tab="stats" onclick="switchTab('stats')" aria-label="Статистика">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V3"/></svg>
-      <span>Статистика</span>
     </button>
     <button class="tab" data-tab="history" onclick="switchTab('history')" aria-label="История">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
-      <span>История</span>
+    </button>
+    <button class="tab" onclick="openSettings()" aria-label="Настройки">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
   </nav>
 </div>
@@ -626,14 +593,7 @@ function renderGrid() {
     btn.style.setProperty('--c', c.color);
     btn.onclick = () => toggleCategory(c.id);
     const todayMs = todayTotals[c.id] || 0;
-    btn.innerHTML = `
-      <div class="cat-text">
-        <div class="cat-name">${escapeHtml(c.name)}</div>
-      </div>
-      ${isActive
-        ? `<div class="cat-time" id="cat-running-${c.id}">00:00:00</div>`
-        : (todayMs > 0 ? `<div class="cat-time">${fmtDur(todayMs)}</div>` : '')}
-    `;
+    btn.innerHTML = `<div class="cat-name">${escapeHtml(c.name)}</div>`;
     grid.appendChild(btn);
   });
 
@@ -645,8 +605,6 @@ function renderGrid() {
 function renderTimeline() {
   const track = document.getElementById('timeline-track');
   const axis = document.getElementById('timeline-axis');
-  const legend = document.getElementById('timeline-legend');
-  const totalEl = document.getElementById('timeline-total');
   if (!track) return;
 
   const dayStart = startOfDay(new Date());
@@ -700,37 +658,20 @@ function renderTimeline() {
     track.appendChild(nowMark);
   }
 
-  // Ось часов: 24h → тики каждые 3 часа, с лейблом каждые 6
+  // Ось часов: 24h → тики каждые 3 часа, с лейблом каждые 6 в формате "18:00"
   axis.innerHTML = '';
   for (let h = 0; h <= 24; h += 3) {
     const t = new Date(dayStart.getTime() + h * 3600000);
     const tick = document.createElement('div');
     tick.className = 'timeline-tick' + (h % 6 === 0 ? ' major' : '');
     tick.style.left = pct(t) + '%';
-    if (h % 6 === 0) {
-      tick.textContent = h === 24 ? '24' : String(h).padStart(2, '0');
+    if (h % 6 === 0 && h !== 0 && h !== 24) {
+      tick.textContent = String(h).padStart(2, '0') + ':00';
     }
     axis.appendChild(tick);
   }
 
-  // Легенда: только категории с временем сегодня
-  legend.innerHTML = '';
   const dayTotal = Object.values(totals).reduce((a, b) => a + b, 0);
-  totalEl.textContent = dayTotal > 0 ? fmtDur(dayTotal) : '—';
-  state.categories
-    .filter(c => totals[c.id])
-    .sort((a, b) => totals[b.id] - totals[a.id])
-    .forEach(c => {
-      const item = document.createElement('div');
-      item.className = 'timeline-legend-item';
-      item.innerHTML = `<div class="d" style="background:${c.color}"></div><span>${escapeHtml(c.name)}</span>`;
-      legend.appendChild(item);
-    });
-  if (dayTotal === 0) {
-    legend.innerHTML = '<div class="timeline-empty" style="width:100%">Сегодня ещё ничего не трекалось</div>';
-  }
-
-  // Bars + text под таймлайном
   renderTodayStats(totals, dayTotal);
 }
 
