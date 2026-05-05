@@ -12,6 +12,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Tracker" />
 <meta name="mobile-web-app-capable" content="yes" />
+<script>
+  // Синхронно проверяем наличие сессии до рендера, чтобы не было мигания экрана входа
+  try {
+    if (localStorage.getItem('sb-rdotiwxihcolalrjihtb-auth-token')) {
+      document.documentElement.classList.add('authed');
+    }
+  } catch(e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -386,6 +394,10 @@
   .gate-card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
 
   .hidden { display: none !important; }
+
+  /* Pre-render decision: если есть сессия в localStorage — не показываем gate */
+  html.authed #gate { display: none !important; }
+  html:not(.authed) #app { display: none !important; }
 </style>
 </head>
 <body>
@@ -405,7 +417,7 @@
   </form>
 </div>
 
-<div class="app hidden" id="app">
+<div class="app" id="app">
   <!-- TRACK TAB -->
   <section id="tab-track">
     <div class="timeline-card">
@@ -1093,26 +1105,23 @@ async function bootAuth() {
 
 async function applySession(s) {
   session = s;
-  const gate = document.getElementById('gate');
-  const app = document.getElementById('app');
+  const html = document.documentElement;
   if (s) {
     try {
       document.getElementById('user-email').textContent = s.user.email;
+      // Сразу показываем app, чтобы не зависать на "Загрузка..."
+      html.classList.add('authed');
       await loadAll();
       setupRealtime();
       renderGrid();
-      gate.classList.add('hidden');
-      app.classList.remove('hidden');
     } catch (e) {
       console.error('applySession failed:', e);
+      html.classList.remove('authed');
       const status = document.getElementById('gate-status');
       if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка загрузки: ' + (e.message || e); }
-      gate.classList.remove('hidden');
-      app.classList.add('hidden');
     }
   } else {
-    gate.classList.remove('hidden');
-    app.classList.add('hidden');
+    html.classList.remove('authed');
     if (realtime) { sb.removeChannel(realtime); realtime = null; }
     state = { categories: [], entries: [], active: null, warnMinutes: 25 };
   }
@@ -1128,7 +1137,10 @@ async function signInPassword() {
   try {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    status.style.color = '#10b981'; status.textContent = 'Готово, загружаю...';
+    if (!data || !data.session) {
+      throw new Error('Сессия не получена. Возможно, требуется подтвердить email.');
+    }
+    status.style.color = '#10b981'; status.textContent = 'Загрузка...';
     await applySession(data.session);
   } catch (e) {
     console.error('signIn:', e);
