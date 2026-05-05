@@ -1276,6 +1276,8 @@ async function applySession(s) {
       // 1. Мгновенный рендер из кэша если есть
       if (loadCache()) renderGrid();
       updateQueueBadge();
+      // Сразу показываем уведомление в шторке из закэшированного активного таймера
+      if (state.active) showActiveNotif(true);
       // 1.5. Если есть pending — гоняем их в фоне, не блокируя загрузку
       if (queue.length > 0) processQueue();
       // 2. Фоновое обновление с сервера
@@ -1284,6 +1286,7 @@ async function applySession(s) {
       setupRealtime();
       renderGrid();
       if (state.active) showActiveNotif(true);
+      else clearActiveNotif();
       // Диагностика: если данные пустые — показываем баннер
       const diag = document.getElementById('diag-banner');
       if (diag) {
@@ -1365,21 +1368,26 @@ async function logout() {
 /* ---------- Data load ---------- */
 async function loadAll() {
   if (!session) throw new Error('Нет активной сессии');
-  const withTimeout = (p, ms = 15000, label = 'query') => Promise.race([
+  const withTimeout = (p, ms = 30000, label = 'query') => Promise.race([
     p, new Promise((_, rej) => setTimeout(() => rej(new Error('Таймаут: ' + label)), ms))
   ]);
-  const [cats, ents, settings] = await Promise.all([
-    withTimeout(sb.from('categories').select('*').order('position'), 15000, 'categories'),
-    withTimeout(sb.from('entries').select('*').order('start_at', { ascending: false }).limit(5000), 15000, 'entries'),
-    withTimeout(sb.from('settings').select('*').maybeSingle(), 15000, 'settings')
-  ]);
-  if (cats.error)     throw new Error('categories: ' + cats.error.message);
-  if (ents.error)     throw new Error('entries: ' + ents.error.message);
-  if (settings.error) throw new Error('settings: ' + settings.error.message);
-
+  // Категории — критично, грузим первыми
+  const cats = await withTimeout(sb.from('categories').select('*').order('position'), 30000, 'categories');
+  if (cats.error) throw new Error('categories: ' + cats.error.message);
   state.categories = (cats.data || []).map(c => ({
     id: c.id, name: c.name, color: c.color, position: c.position
   }));
+  // После категорий уже можно частично рендерить
+  saveCache(); renderGrid();
+
+  // Settings и entries — параллельно
+  const [ents, settings] = await Promise.all([
+    withTimeout(sb.from('entries').select('*').order('start_at', { ascending: false }).limit(2000), 30000, 'entries'),
+    withTimeout(sb.from('settings').select('*').maybeSingle(), 15000, 'settings')
+  ]);
+  if (ents.error)     throw new Error('entries: ' + ents.error.message);
+  if (settings.error) throw new Error('settings: ' + settings.error.message);
+
   state.entries = [];
   state.active = null;
   (ents.data || []).forEach(e => {
