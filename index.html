@@ -1430,6 +1430,14 @@ window.addEventListener('online', setOnlineState);
 window.addEventListener('offline', setOnlineState);
 setInterval(() => { if (queue.length > 0 && navigator.onLine) processQueue(); }, 30000);
 
+// При возврате PWA/вкладки на экран — пересинкаемся (realtime мог отвалиться в фоне)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && session) {
+    setupRealtime();
+    syncSoon();
+  }
+});
+
 function setupRealtime() {
   if (realtime) sb.removeChannel(realtime);
   realtime = sb.channel('user-data')
