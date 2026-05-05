@@ -18,7 +18,14 @@
     if (localStorage.getItem('sb-rdotiwxihcolalrjihtb-auth-token')) {
       document.documentElement.classList.add('authed');
     }
+    if (!navigator.onLine) document.documentElement.classList.add('offline');
   } catch(e) {}
+  // Регистрация service worker (нужен для запуска PWA без сети)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW register failed:', e));
+    });
+  }
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -398,6 +405,26 @@
   /* Pre-render decision: если есть сессия в localStorage — не показываем gate */
   html.authed #gate { display: none !important; }
   html:not(.authed) #app { display: none !important; }
+
+  /* Tab badge for pending sync count */
+  .tab { position: relative; }
+  .tab-badge {
+    position: absolute; top: 4px; right: calc(50% - 18px);
+    min-width: 8px; height: 8px;
+    background: var(--danger); border: 2px solid var(--bg);
+    border-radius: 50%;
+  }
+
+  /* Offline pill at top of dashboard */
+  .offline-pill {
+    display: none;
+    margin: 0 0 10px; padding: 8px 12px;
+    background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.35);
+    color: #fca5a5; border-radius: 10px;
+    font-size: 13px; font-weight: 500; letter-spacing: -0.01em;
+    text-align: center;
+  }
+  html.offline .offline-pill { display: block; }
 </style>
 </head>
 <body>
@@ -420,6 +447,7 @@
 <div class="app" id="app">
   <!-- TRACK TAB -->
   <section id="tab-track">
+    <div class="offline-pill" id="offline-pill">Офлайн — изменения сохранятся локально и синхронизируются позже</div>
     <div class="timeline-card">
       <div class="timeline-track" id="timeline-track"></div>
       <div class="timeline-axis" id="timeline-axis"></div>
@@ -541,7 +569,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 let session = null;
 let realtime = null;
 let syncTimer = null;
-let pendingMutations = 0;   // защита от перезаписи realtime-ом во время локальной мутации
 
 let state = {
   categories: [],
@@ -772,42 +799,36 @@ function tick() {
 }
 
 /* ---------- Tracker actions ---------- */
-async function toggleCategory(catId) {
+function toggleCategory(catId) {
   if (!session) return;
-  pendingMutations++;
-  try {
-    const t = now();
-    const uid_ = session.user.id;
-    if (state.active) {
-      const wasSame = state.active.catId === catId;
-      const closingId = state.active.id;
-      const closingStart = state.active.start;
-      const closingCat = state.active.catId;
-      // Optimistic: закрыть текущий + сразу открыть новый
-      state.entries.unshift({ id: closingId, catId: closingCat, start: closingStart, end: t });
-      const newActive = wasSame ? null : { id: newId(), catId, start: t };
-      state.active = newActive;
-      renderGrid();
-      // Server: сначала закрытие, потом (если нужно) открытие нового
-      const { error } = await sb.from('entries').update({ end_at: t }).eq('id', closingId);
-      if (error) { alert('Ошибка: ' + error.message); await loadAll(); renderGrid(); return; }
-      if (newActive) {
-        const { error: e2 } = await sb.from('entries').insert({
-          id: newActive.id, user_id: uid_, category_id: catId, start_at: t
-        });
-        if (e2) { alert('Ошибка: ' + e2.message); state.active = null; await loadAll(); renderGrid(); }
-      }
-    } else {
-      const id = newId();
-      state.active = { id, catId, start: t };
-      renderGrid();
-      const { error } = await sb.from('entries').insert({ id, user_id: uid_, category_id: catId, start_at: t });
-      if (error) { alert('Ошибка: ' + error.message); state.active = null; await loadAll(); renderGrid(); }
+  const t = now();
+  const uid_ = session.user.id;
+  if (state.active) {
+    const wasSame = state.active.catId === catId;
+    const closingId = state.active.id;
+    const closingStart = state.active.start;
+    const closingCat = state.active.catId;
+    state.entries.unshift({ id: closingId, catId: closingCat, start: closingStart, end: t });
+    const newActive = wasSame ? null : { id: newId(), catId, start: t };
+    state.active = newActive;
+    saveCache();
+    renderGrid();
+    mutate({ op: 'update', table: 'entries', payload: { end_at: t }, where: { id: closingId } });
+    if (newActive) {
+      mutate({ op: 'insert', table: 'entries', payload: {
+        id: newActive.id, user_id: uid_, category_id: catId, start_at: t
+      }});
     }
-    if (currentTab === 'history') renderHistory();
-  } finally {
-    pendingMutations--;
+  } else {
+    const id = newId();
+    state.active = { id, catId, start: t };
+    saveCache();
+    renderGrid();
+    mutate({ op: 'insert', table: 'entries', payload: {
+      id, user_id: uid_, category_id: catId, start_at: t
+    }});
   }
+  if (currentTab === 'history') renderHistory();
 }
 
 /* ---------- Stats ---------- */
@@ -943,7 +964,7 @@ function closeEdit() {
   document.getElementById('edit-modal').classList.add('hidden');
   editingEntryId = null;
 }
-async function saveEdit() {
+function saveEdit() {
   const e = state.entries.find(x => x.id === editingEntryId);
   if (!e) return;
   const s = new Date(document.getElementById('edit-start').value);
@@ -952,23 +973,25 @@ async function saveEdit() {
   const newCat = document.getElementById('edit-cat').value;
   const start = s.toISOString();
   const end = en.toISOString();
-  const { error } = await sb.from('entries').update({
-    category_id: newCat, start_at: start, end_at: end
-  }).eq('id', e.id);
-  if (error) { alert('Ошибка: ' + error.message); return; }
   e.catId = newCat; e.start = start; e.end = end;
+  saveCache();
   closeEdit();
   renderHistory(); renderGrid();
   if (currentTab === 'stats') renderStats();
+  mutate({ op: 'update', table: 'entries',
+    payload: { category_id: newCat, start_at: start, end_at: end },
+    where: { id: e.id }
+  });
 }
-async function deleteEntry() {
+function deleteEntry() {
   if (!confirm('Удалить запись?')) return;
-  const { error } = await sb.from('entries').delete().eq('id', editingEntryId);
-  if (error) { alert('Ошибка: ' + error.message); return; }
-  state.entries = state.entries.filter(x => x.id !== editingEntryId);
+  const id = editingEntryId;
+  state.entries = state.entries.filter(x => x.id !== id);
+  saveCache();
   closeEdit();
   renderHistory(); renderGrid();
   if (currentTab === 'stats') renderStats();
+  mutate({ op: 'delete', table: 'entries', where: { id } });
 }
 function toLocalInput(d) {
   const pad = n => String(n).padStart(2,'0');
@@ -982,32 +1005,32 @@ function openSettings() {
   if (session) document.getElementById('user-email').textContent = session.user.email;
   document.getElementById('settings-modal').classList.remove('hidden');
 }
-async function saveWarnMinutes() {
+function saveWarnMinutes() {
   const v = parseInt(document.getElementById('set-warn-minutes').value, 10);
   if (!v || v < 1 || v > 240) { alert('Введи число от 1 до 240'); return; }
   state.warnMinutes = v;
-  const { error } = await sb.from('settings').upsert({
-    user_id: session.user.id, warn_minutes: v, updated_at: new Date().toISOString()
-  });
-  if (error) { alert('Ошибка: ' + error.message); return; }
+  saveCache();
   tick();
+  mutate({ op: 'upsert', table: 'settings', payload: {
+    user_id: session.user.id, warn_minutes: v, updated_at: new Date().toISOString()
+  }});
   alert('Сохранено: ' + v + ' мин');
 }
-async function closeSettings() {
+function closeSettings() {
   document.getElementById('settings-modal').classList.add('hidden');
-  await saveAllCategories();
+  saveAllCategories();
   renderGrid();
   if (currentTab === 'stats') renderStats();
   if (currentTab === 'history') renderHistory();
 }
-async function saveAllCategories() {
+function saveAllCategories() {
   syncSettingsInputs();
   if (!session || !state.categories.length) return;
+  saveCache();
   const updates = state.categories.map((c, i) => ({
     id: c.id, user_id: session.user.id, name: c.name, color: c.color, position: i
   }));
-  const { error } = await sb.from('categories').upsert(updates);
-  if (error) console.error('saveAllCategories', error);
+  mutate({ op: 'upsert', table: 'categories', payload: updates });
 }
 function renderSettingsCats() {
   const list = document.getElementById('settings-cats');
@@ -1031,21 +1054,21 @@ function syncSettingsInputs() {
     if (state.categories[i]) state.categories[i][field] = inp.value;
   });
 }
-async function addCategory() {
-  await saveAllCategories();
+function addCategory() {
+  saveAllCategories();
   const palette = ['#5e6ad2','#10b981','#f59e0b','#06b6d4','#ec4899','#a855f7','#f43f5e','#14b8a6','#eab308','#3b82f6','#84cc16'];
   const used = new Set(state.categories.map(c => c.color.toLowerCase()));
   const color = palette.find(p => !used.has(p.toLowerCase())) || palette[Math.floor(Math.random() * palette.length)];
   const id = newId();
   const position = state.categories.length;
-  const { error } = await sb.from('categories').insert({
-    id, user_id: session.user.id, name: 'Новая категория', color, position
-  });
-  if (error) { alert('Ошибка: ' + error.message); return; }
   state.categories.push({ id, name: 'Новая категория', color, position });
+  saveCache();
   renderSettingsCats();
+  mutate({ op: 'insert', table: 'categories', payload: {
+    id, user_id: session.user.id, name: 'Новая категория', color, position
+  }});
 }
-async function removeCategory(i) {
+function removeCategory(i) {
   syncSettingsInputs();
   const c = state.categories[i];
   if (!c) return;
@@ -1054,12 +1077,12 @@ async function removeCategory(i) {
   if (hasEntries || isActive) {
     if (!confirm(`У категории "${c.name}" есть записи. Удалить категорию и все её записи?`)) return;
   }
-  const { error } = await sb.from('categories').delete().eq('id', c.id);
-  if (error) { alert('Ошибка: ' + error.message); return; }
   state.categories.splice(i, 1);
   state.entries = state.entries.filter(e => e.catId !== c.id);
   if (isActive) state.active = null;
+  saveCache();
   renderSettingsCats();
+  mutate({ op: 'delete', table: 'categories', where: { id: c.id } });
 }
 
 /* ---------- Data import/export ---------- */
@@ -1145,6 +1168,9 @@ async function applySession(s) {
       html.classList.add('authed');
       // 1. Мгновенный рендер из кэша если есть
       if (loadCache()) renderGrid();
+      updateQueueBadge();
+      // 1.5. Если есть pending мутации — сначала их разгоняем
+      if (queue.length > 0) await processQueue();
       // 2. Фоновое обновление с сервера
       await loadAll();
       saveCache();
@@ -1165,7 +1191,9 @@ async function applySession(s) {
     html.classList.remove('authed');
     if (realtime) { sb.removeChannel(realtime); realtime = null; }
     state = { categories: [], entries: [], active: null, warnMinutes: 25 };
-    try { localStorage.removeItem(CACHE_KEY); } catch {}
+    try { localStorage.removeItem(CACHE_KEY); localStorage.removeItem(QUEUE_KEY); } catch {}
+    queue = [];
+    updateQueueBadge();
   }
 }
 
@@ -1243,6 +1271,91 @@ async function loadAll() {
   state.warnMinutes = settings.data?.warn_minutes || 25;
 }
 
+/* ---------- Offline-first mutation queue ---------- */
+const QUEUE_KEY = 'tracker.queue.v1';
+let queue = (() => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch { return []; } })();
+let queueProcessing = false;
+
+function saveQueue() {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch {}
+  updateQueueBadge();
+}
+
+function updateQueueBadge() {
+  const tabs = document.querySelectorAll('.tab');
+  const settingsTab = tabs[tabs.length - 1];
+  if (!settingsTab) return;
+  let badge = settingsTab.querySelector('.tab-badge');
+  if (queue.length > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'tab-badge';
+      settingsTab.appendChild(badge);
+    }
+    badge.title = queue.length + ' изменений ждут синхронизации';
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
+function mutate(op) {
+  queue.push(op);
+  saveQueue();
+  processQueue();
+}
+
+async function execOp(item) {
+  const { op, table, payload, where } = item;
+  let result;
+  if (op === 'insert')      result = await sb.from(table).insert(payload);
+  else if (op === 'update') result = await sb.from(table).update(payload).eq('id', where.id);
+  else if (op === 'delete') result = await sb.from(table).delete().eq('id', where.id);
+  else if (op === 'upsert') result = await sb.from(table).upsert(payload);
+  else throw new Error('unknown op: ' + op);
+  if (result.error) {
+    if (op === 'insert' && (result.error.code === '23505' || /duplicate/i.test(result.error.message))) return;
+    if (op === 'delete' && result.error.code === 'PGRST116') return;
+    throw new Error(result.error.message || JSON.stringify(result.error));
+  }
+}
+
+async function processQueue() {
+  if (queueProcessing) return;
+  if (!session) return;
+  if (!navigator.onLine) return;
+  queueProcessing = true;
+  let drained = false;
+  try {
+    while (queue.length > 0 && navigator.onLine) {
+      const item = queue[0];
+      try {
+        await execOp(item);
+        queue.shift();
+        saveQueue();
+      } catch (e) {
+        item.attempts = (item.attempts || 0) + 1;
+        item.lastError = String(e.message || e);
+        saveQueue();
+        console.warn('queue item failed (attempt ' + item.attempts + '):', item, e);
+        if (item.attempts >= 5) { queue.shift(); saveQueue(); continue; }
+        break;
+      }
+    }
+    drained = (queue.length === 0);
+  } finally {
+    queueProcessing = false;
+  }
+  if (drained && session) syncSoon();
+}
+
+function setOnlineState() {
+  document.documentElement.classList.toggle('offline', !navigator.onLine);
+  if (navigator.onLine) processQueue();
+}
+window.addEventListener('online', setOnlineState);
+window.addEventListener('offline', setOnlineState);
+setInterval(() => { if (queue.length > 0 && navigator.onLine) processQueue(); }, 30000);
+
 function setupRealtime() {
   if (realtime) sb.removeChannel(realtime);
   realtime = sb.channel('user-data')
@@ -1254,9 +1367,9 @@ function setupRealtime() {
 function syncSoon() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
-    if (pendingMutations > 0) { syncSoon(); return; }
-    await loadAll();
-    saveCache();
+    if (queue.length > 0) { syncSoon(); return; }
+    if (!navigator.onLine) { syncSoon(); return; }
+    try { await loadAll(); saveCache(); } catch(e) { console.warn('syncSoon loadAll failed:', e); return; }
     if (currentTab === 'track')   renderGrid();
     if (currentTab === 'stats')   renderStats();
     if (currentTab === 'history') renderHistory();
