@@ -1096,12 +1096,20 @@ async function applySession(s) {
   const gate = document.getElementById('gate');
   const app = document.getElementById('app');
   if (s) {
-    gate.classList.add('hidden');
-    app.classList.remove('hidden');
-    document.getElementById('user-email').textContent = s.user.email;
-    await loadAll();
-    setupRealtime();
-    renderGrid();
+    try {
+      document.getElementById('user-email').textContent = s.user.email;
+      await loadAll();
+      setupRealtime();
+      renderGrid();
+      gate.classList.add('hidden');
+      app.classList.remove('hidden');
+    } catch (e) {
+      console.error('applySession failed:', e);
+      const status = document.getElementById('gate-status');
+      if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка загрузки: ' + (e.message || e); }
+      gate.classList.remove('hidden');
+      app.classList.add('hidden');
+    }
   } else {
     gate.classList.remove('hidden');
     app.classList.add('hidden');
@@ -1117,10 +1125,18 @@ async function signInPassword() {
   const btn = document.getElementById('gate-submit');
   if (!email || !password) { status.style.color = 'var(--danger)'; status.textContent = 'Введи email и пароль'; return; }
   btn.disabled = true; status.style.color = 'var(--muted)'; status.textContent = 'Вход...';
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  btn.disabled = false;
-  if (error) { status.style.color = 'var(--danger)'; status.textContent = error.message; }
-  else { status.style.color = '#10b981'; status.textContent = 'Готово'; }
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    status.style.color = '#10b981'; status.textContent = 'Готово, загружаю...';
+    await applySession(data.session);
+  } catch (e) {
+    console.error('signIn:', e);
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Ошибка: ' + (e.message || e);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function sendMagicLink() {
