@@ -2,7 +2,7 @@
 // Кеширует HTML/JS/иконки чтобы PWA запускалось без сети.
 // API запросы (Supabase) НЕ перехватываем — они идут напрямую.
 
-const CACHE = 'tracker-v5';
+const CACHE = 'tracker-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -31,21 +31,29 @@ self.addEventListener('activate', (e) => {
 // Клик по уведомлению (включая action "Стоп") — пробрасываем в открытое окно
 self.addEventListener('notificationclick', (e) => {
   const action = e.action; // '' | 'stop'
-  // close() только при стопе. На body-тапе оставляем, JS пересоздаст.
   if (action === 'stop') e.notification.close();
   e.waitUntil((async () => {
+    const scope = self.registration.scope;
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // Берём только наши клиенты (в нашем scope)
+    const ours = all.filter(c => c.url.startsWith(scope));
     if (action === 'stop') {
-      if (all.length > 0) {
-        all.forEach(c => c.postMessage({ type: 'stop-active' }));
-        all[0].focus().catch(() => {});
+      if (ours.length > 0) {
+        ours.forEach(c => c.postMessage({ type: 'stop-active' }));
+        try { await ours[0].focus(); }
+        catch { await self.clients.openWindow(scope + '?stop=1'); }
       } else {
-        await self.clients.openWindow('./?stop=1');
+        await self.clients.openWindow(scope + '?stop=1');
       }
-    } else {
-      if (all.length > 0) all[0].focus().catch(() => {});
-      else await self.clients.openWindow('./');
+      return;
     }
+    // Body tap — открываем/фокусируем PWA
+    if (ours.length > 0) {
+      try { await ours[0].focus(); return; }
+      catch {}
+    }
+    try { await self.clients.openWindow(scope); }
+    catch (err) { console.warn('openWindow failed:', err); }
   })());
 });
 

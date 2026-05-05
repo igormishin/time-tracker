@@ -448,6 +448,7 @@
   <!-- TRACK TAB -->
   <section id="tab-track">
     <div class="offline-pill" id="offline-pill">Офлайн — изменения сохранятся локально и синхронизируются позже</div>
+    <div id="diag-banner" style="display:none; margin:0 0 10px; padding:10px 12px; background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.35); color:#fca5a5; border-radius:10px; font-size:12.5px; line-height:1.4;"></div>
     <div class="timeline-card">
       <div class="timeline-track" id="timeline-track"></div>
       <div class="timeline-axis" id="timeline-axis"></div>
@@ -828,8 +829,10 @@ async function showActiveNotif(force = false) {
   try {
     const reg = await navigator.serviceWorker.ready;
     const clock = fmtClock(ms);
-    const body = warn ? `${clock} — пора переключаться` : clock;
-    await reg.showNotification(c.name, {
+    // Время в title (он жирный), категория во второй строке
+    const title = warn ? `⚠ ${clock}  ·  ${c.name}` : `${clock}  ·  ${c.name}`;
+    const body = warn ? 'Пора переключаться' : 'Идёт трекер';
+    await reg.showNotification(title, {
       body,
       tag: 'tracker-active',
       icon: 'icons/app-icon-v3-192.png',
@@ -1209,14 +1212,21 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;'
 function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
 /* ---------- Auth ---------- */
+const withTimeoutP = (p, ms, label) => Promise.race([
+  p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout: ' + label)), ms))
+]);
+
 async function bootAuth() {
   try {
-    const { data: { session: s0 } } = await sb.auth.getSession();
+    // Если есть кэш — показываем дашборд мгновенно, ещё ДО проверки сессии
+    if (document.documentElement.classList.contains('authed') && loadCache()) {
+      renderGrid();
+    }
+    const { data: { session: s0 } } = await withTimeoutP(sb.auth.getSession(), 8000, 'getSession');
     let s = s0;
-    // Принудительный refresh, если есть сессия — гарантируем свежий токен
     if (s0 && s0.refresh_token) {
       try {
-        const r = await sb.auth.refreshSession();
+        const r = await withTimeoutP(sb.auth.refreshSession(), 8000, 'refreshSession');
         if (!r.error && r.data.session) s = r.data.session;
       } catch (e) { console.warn('refreshSession failed, using existing:', e); }
     }
@@ -1224,9 +1234,9 @@ async function bootAuth() {
     sb.auth.onAuthStateChange(async (_event, ses) => { await applySession(ses); });
   } catch (e) {
     console.error('bootAuth failed:', e);
-    document.documentElement.classList.remove('authed');
-    const status = document.getElementById('gate-status');
-    if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка инициализации: ' + e.message; }
+    // Оставляем кэш (если был), показываем диагностику
+    const diag = document.getElementById('diag-banner');
+    if (diag) { diag.style.display = 'block'; diag.textContent = 'Ошибка авторизации: ' + e.message; }
   }
 }
 
@@ -1273,17 +1283,29 @@ async function applySession(s) {
       saveCache();
       setupRealtime();
       renderGrid();
-      // Восстановить уведомление если есть активный таймер
       if (state.active) showActiveNotif(true);
+      // Диагностика: если данные пустые — показываем баннер
+      const diag = document.getElementById('diag-banner');
+      if (diag) {
+        if (state.categories.length === 0) {
+          diag.style.display = 'block';
+          diag.innerHTML = `Аккаунт <b>${escapeHtml(s.user.email)}</b><br>Категорий нет в базе. Проверь что ты вошёл правильным аккаунтом, или перезалейте дефолтные категории через SQL Editor.`;
+        } else {
+          diag.style.display = 'none';
+        }
+      }
     } catch (e) {
       console.error('applySession failed:', e);
-      // Если есть кэш — оставляем его и ругаемся в углу, а не выгоняем на гейт
-      if (state.categories.length === 0) {
+      const diag = document.getElementById('diag-banner');
+      if (diag && state.categories.length > 0) {
+        // Кэш есть — показываем его, ошибку выводим как баннер
+        diag.style.display = 'block';
+        diag.textContent = 'Не удалось обновить: ' + (e.message || e);
+      } else if (state.categories.length === 0) {
+        // Нет ни кэша, ни данных — на гейт с ошибкой
         html.classList.remove('authed');
         const status = document.getElementById('gate-status');
         if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка загрузки: ' + (e.message || e); }
-      } else {
-        console.warn('Showing stale cache due to load error');
       }
     }
   } else {
@@ -1479,6 +1501,11 @@ function syncSoon() {
 }
 
 /* ---------- Boot ---------- */
+// Если есть кэш — показываем дашборд мгновенно, не дожидаясь сети
+if (document.documentElement.classList.contains('authed')) {
+  if (loadCache()) renderGrid();
+  updateQueueBadge();
+}
 bootAuth();
 tickInterval = setInterval(tick, 1000);
 setInterval(() => {
