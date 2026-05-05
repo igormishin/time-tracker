@@ -827,16 +827,15 @@ async function showActiveNotif(force = false) {
   const warn = minutes >= limit;
   try {
     const reg = await navigator.serviceWorker.ready;
-    const body = warn
-      ? `${minutes} мин — пора переключаться`
-      : (minutes === 0 ? 'идёт' : `идёт ${minutes} мин`);
+    const clock = fmtClock(ms);
+    const body = warn ? `${clock} — пора переключаться` : clock;
     await reg.showNotification(c.name, {
       body,
       tag: 'tracker-active',
       icon: 'icons/app-icon-v3-192.png',
       badge: 'icons/app-icon-v3-192.png',
       silent: !warn,
-      renotify: warn && minutes === limit, // звук/вибро только в момент достижения порога
+      renotify: warn && minutes === limit,
       requireInteraction: true,
       actions: [{ action: 'stop', title: 'Стоп' }],
       timestamp: new Date(state.active.start).getTime(),
@@ -862,6 +861,13 @@ if ('serviceWorker' in navigator) {
     }
   });
 }
+
+// Когда юзер сворачивает PWA — принудительно пересоздаём уведомление
+// (Android закрывает его при тапе на тело — пересоздаём, чтобы держалось пока таймер идёт)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state.active) showActiveNotif(true);
+  if (!document.hidden && state.active) showActiveNotif(true);
+});
 
 // Если PWA открылась через ?stop=1 (не было открытых окон при тапе на Стоп)
 (function handleStopParam() {
@@ -1260,8 +1266,8 @@ async function applySession(s) {
       // 1. Мгновенный рендер из кэша если есть
       if (loadCache()) renderGrid();
       updateQueueBadge();
-      // 1.5. Если есть pending мутации — сначала их разгоняем
-      if (queue.length > 0) await processQueue();
+      // 1.5. Если есть pending — гоняем их в фоне, не блокируя загрузку
+      if (queue.length > 0) processQueue();
       // 2. Фоновое обновление с сервера
       await loadAll();
       saveCache();
@@ -1399,11 +1405,14 @@ function mutate(op) {
 
 async function execOp(item) {
   const { op, table, payload, where } = item;
+  const withTimeout = (p) => Promise.race([
+    p, new Promise((_, rej) => setTimeout(() => rej(new Error('execOp timeout')), 10000))
+  ]);
   let result;
-  if (op === 'insert')      result = await sb.from(table).insert(payload);
-  else if (op === 'update') result = await sb.from(table).update(payload).eq('id', where.id);
-  else if (op === 'delete') result = await sb.from(table).delete().eq('id', where.id);
-  else if (op === 'upsert') result = await sb.from(table).upsert(payload);
+  if (op === 'insert')      result = await withTimeout(sb.from(table).insert(payload));
+  else if (op === 'update') result = await withTimeout(sb.from(table).update(payload).eq('id', where.id));
+  else if (op === 'delete') result = await withTimeout(sb.from(table).delete().eq('id', where.id));
+  else if (op === 'upsert') result = await withTimeout(sb.from(table).upsert(payload));
   else throw new Error('unknown op: ' + op);
   if (result.error) {
     if (op === 'insert' && (result.error.code === '23505' || /duplicate/i.test(result.error.message))) return;
