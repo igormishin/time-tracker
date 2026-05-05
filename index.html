@@ -789,24 +789,24 @@ function stopActive() {
   toggleCategory(state.active.catId);
 }
 
-// Принудительный сброс активного таймера (если завис)
-function forceStopActive() {
-  console.log('[forceStopActive] state.active =', state.active);
-  if (state.active) {
-    const t = now();
-    const closing = state.active;
-    state.entries.unshift({ id: closing.id, catId: closing.catId, start: closing.start, end: t });
-    state.active = null;
+// Принудительный сброс ВСЕХ активных таймеров (закрывает зомби-записи на сервере)
+async function forceStopActive() {
+  const t = now();
+  state.active = null;
+  saveCache();
+  document.getElementById('now').classList.remove('running', 'warn');
+  document.getElementById('now').classList.add('idle');
+  renderGrid();
+  try {
+    const { error, count } = await sb.from('entries')
+      .update({ end_at: t }, { count: 'exact' })
+      .is('end_at', null);
+    if (error) { alert('Ошибка: ' + error.message); return; }
+    await loadAll();
     saveCache();
     renderGrid();
-    mutate({ op: 'update', table: 'entries', payload: { end_at: t }, where: { id: closing.id } });
-  } else {
-    // Подчистим всё руками
-    document.getElementById('now').classList.remove('running', 'warn');
-    document.getElementById('now').classList.add('idle');
-    renderGrid();
-  }
-  alert('Активный таймер сброшен');
+    alert('Закрыто активных записей на сервере: ' + (count ?? '?'));
+  } catch (e) { alert('Ошибка: ' + e.message); }
 }
 
 function tick() {
