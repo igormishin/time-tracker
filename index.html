@@ -529,6 +529,7 @@
 
     <div class="section-title">Данные</div>
     <button class="btn secondary" onclick="exportData()">Экспорт JSON</button>
+    <button class="btn secondary" onclick="forceStopActive(); closeSettings();" style="margin-top: 8px;">Сбросить активный таймер</button>
   </div>
 </div>
 
@@ -778,8 +779,34 @@ function renderNow() {
 }
 
 function stopActive() {
-  if (!state.active) return;
+  console.log('[stopActive] state.active =', state.active);
+  if (!state.active) {
+    // Fallback: даже если local state потерян, чистим UI
+    document.getElementById('now').classList.remove('running', 'warn');
+    document.getElementById('now').classList.add('idle');
+    return;
+  }
   toggleCategory(state.active.catId);
+}
+
+// Принудительный сброс активного таймера (если завис)
+function forceStopActive() {
+  console.log('[forceStopActive] state.active =', state.active);
+  if (state.active) {
+    const t = now();
+    const closing = state.active;
+    state.entries.unshift({ id: closing.id, catId: closing.catId, start: closing.start, end: t });
+    state.active = null;
+    saveCache();
+    renderGrid();
+    mutate({ op: 'update', table: 'entries', payload: { end_at: t }, where: { id: closing.id } });
+  } else {
+    // Подчистим всё руками
+    document.getElementById('now').classList.remove('running', 'warn');
+    document.getElementById('now').classList.add('idle');
+    renderGrid();
+  }
+  alert('Активный таймер сброшен');
 }
 
 function tick() {
@@ -801,7 +828,8 @@ function tick() {
 
 /* ---------- Tracker actions ---------- */
 function toggleCategory(catId) {
-  if (!session) return;
+  console.log('[toggleCategory]', catId, 'state.active=', state.active, 'session=', !!session);
+  if (!session) { console.warn('toggleCategory: no session'); return; }
   const t = now();
   const uid_ = session.user.id;
   const wasActive = !!state.active;
