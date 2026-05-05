@@ -391,14 +391,16 @@
 <body>
 
 <div id="gate" class="gate">
-  <form class="gate-card" onsubmit="event.preventDefault(); sendMagicLink();">
+  <form class="gate-card" onsubmit="event.preventDefault(); signInPassword();">
     <h2 style="display:flex; align-items:center; gap:8px;">
       <span style="width:18px; height:18px; border-radius:5px; background:linear-gradient(135deg,#5e6ad2 0%,#8b5cf6 100%); box-shadow:0 0 12px rgba(94,106,210,0.4);"></span>
       Time Tracker
     </h2>
-    <p>Введи email — придёт ссылка для входа.</p>
-    <input id="gate-email" type="email" autocomplete="email" placeholder="you@example.com" required />
-    <button class="btn" type="submit" id="gate-submit" style="margin-top:10px;">Получить ссылку</button>
+    <p>Войди в свой аккаунт.</p>
+    <input id="gate-email" type="email" autocomplete="email" placeholder="email" required style="margin-bottom:8px;" />
+    <input id="gate-password" type="password" autocomplete="current-password" placeholder="пароль" />
+    <button class="btn" type="submit" id="gate-submit" style="margin-top:10px;">Войти</button>
+    <button type="button" onclick="sendMagicLink()" style="background:transparent; border:0; color:var(--muted); font-size:13px; padding:10px 0 0; width:100%; cursor:pointer; text-decoration:underline;">или прислать ссылку на email</button>
     <p id="gate-status" style="color:var(--muted); margin:12px 0 0; font-size:13px; min-height:18px;"></p>
   </form>
 </div>
@@ -1106,6 +1108,19 @@ async function applySession(s) {
     if (realtime) { sb.removeChannel(realtime); realtime = null; }
     state = { categories: [], entries: [], active: null, warnMinutes: 25 };
   }
+}
+
+async function signInPassword() {
+  const email = document.getElementById('gate-email').value.trim();
+  const password = document.getElementById('gate-password').value;
+  const status = document.getElementById('gate-status');
+  const btn = document.getElementById('gate-submit');
+  if (!email || !password) { status.style.color = 'var(--danger)'; status.textContent = 'Введи email и пароль'; return; }
+  btn.disabled = true; status.style.color = 'var(--muted)'; status.textContent = 'Вход...';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false;
+  if (error) { status.style.color = 'var(--danger)'; status.textContent = error.message; }
+  else { status.style.color = '#10b981'; status.textContent = 'Готово'; }
 }
 
 async function sendMagicLink() {
