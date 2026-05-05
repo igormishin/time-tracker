@@ -76,25 +76,26 @@
     position: relative;
     background: linear-gradient(180deg, var(--surface) 0%, #0f1117 100%);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 18px 18px;
-    margin-bottom: 14px;
+    border-radius: 18px;
+    padding: 32px 22px;
+    margin-bottom: 16px;
     overflow: hidden;
     transition: border-color .3s ease, box-shadow .3s ease;
+    min-height: 110px;
   }
   .now::before {
     content: ''; position: absolute; left: 0; top: 0; right: 0; bottom: 0;
     background: radial-gradient(ellipse at left center, var(--c, transparent) 0%, transparent 60%);
     opacity: 0; transition: opacity .4s ease; pointer-events: none;
   }
-  .now-row { position: relative; display: flex; align-items: center; gap: 12px; }
+  .now-head { position: relative; display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
   .now-dot {
-    width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none;
+    width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none;
     transition: background .25s, box-shadow .25s;
   }
   .now-name {
-    font-weight: 600; font-size: 19px; letter-spacing: -0.02em;
-    flex: 1; min-width: 0;
+    font-weight: 600; font-size: 20px; letter-spacing: -0.025em;
+    min-width: 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .now-time {
@@ -102,11 +103,11 @@
     font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     font-variant-numeric: tabular-nums;
     font-weight: 400;
-    font-size: 38px;
-    letter-spacing: -0.05em;
+    font-size: clamp(56px, 14vw, 84px);
+    letter-spacing: -0.06em;
     line-height: 1;
     color: var(--text);
-    flex: none;
+    text-align: center;
   }
   .now-sub, .now-meta { display: none; }
 
@@ -133,18 +134,6 @@
 
   .now { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
   .now:active { transform: scale(0.99); }
-  .now-stop {
-    width: 36px; height: 36px; flex: none;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid var(--border-strong);
-    border-radius: 9px;
-    color: var(--text);
-    display: inline-flex; align-items: center; justify-content: center;
-    pointer-events: none;
-  }
-  .now-stop::before {
-    content: ''; width: 12px; height: 12px; border-radius: 2px; background: currentColor;
-  }
 
   /* WARN */
   .now.warn {
@@ -238,12 +227,12 @@
   .stats-empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 13px; }
 
   /* Timeline — 24h, top of screen, no card chrome */
-  .timeline-card { padding: 0; margin: 0 0 14px; background: transparent; border: 0; }
+  .timeline-card { padding: 0; margin: 0 0 18px; background: transparent; border: 0; }
   .timeline-head, .timeline-legend { display: none; }
   .timeline-track {
     position: relative;
-    height: 32px;
-    border-radius: 6px;
+    height: 52px;
+    border-radius: 8px;
     background:
       linear-gradient(90deg,
         transparent 0%, transparent calc(25% - 1px),
@@ -283,8 +272,8 @@
     box-shadow: 0 0 0 2px var(--bg), 0 0 8px rgba(255,255,255,0.6);
   }
   .timeline-axis {
-    position: relative; height: 18px; margin-top: 8px;
-    font-size: 10px; color: var(--muted-2); font-variant-numeric: tabular-nums;
+    position: relative; height: 22px; margin-top: 10px;
+    font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 500;
   }
   .timeline-tick {
     position: absolute; top: 0; transform: translateX(-50%);
@@ -371,7 +360,7 @@
 </head>
 <body>
 
-<div id="gate" class="gate hidden">
+<div id="gate" class="gate">
   <form class="gate-card" onsubmit="event.preventDefault(); sendMagicLink();">
     <h2 style="display:flex; align-items:center; gap:8px;">
       <span style="width:18px; height:18px; border-radius:5px; background:linear-gradient(135deg,#5e6ad2 0%,#8b5cf6 100%); box-shadow:0 0 12px rgba(94,106,210,0.4);"></span>
@@ -395,12 +384,11 @@
     <div id="now" class="now idle" role="button" tabindex="0"
          onclick="stopActive()"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();stopActive();}">
-      <div class="now-row">
+      <div class="now-head">
         <div class="now-dot" id="now-dot"></div>
         <div class="now-name" id="now-name"></div>
-        <div class="now-time" id="now-time">00:00:00</div>
-        <div class="now-stop" aria-hidden="true"></div>
       </div>
+      <div class="now-time" id="now-time">00:00:00</div>
     </div>
 
     <div class="grid" id="cat-grid"></div>
@@ -1058,9 +1046,17 @@ function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 
 /* ---------- Auth ---------- */
 async function bootAuth() {
-  const { data: { session: s } } = await sb.auth.getSession();
-  await applySession(s);
-  sb.auth.onAuthStateChange(async (_event, ses) => { await applySession(ses); });
+  try {
+    const { data: { session: s } } = await sb.auth.getSession();
+    await applySession(s);
+    sb.auth.onAuthStateChange(async (_event, ses) => { await applySession(ses); });
+  } catch (e) {
+    console.error('bootAuth failed:', e);
+    document.getElementById('gate').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+    const status = document.getElementById('gate-status');
+    if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка инициализации: ' + e.message; }
+  }
 }
 
 async function applySession(s) {

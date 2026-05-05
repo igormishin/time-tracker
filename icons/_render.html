@@ -17,11 +17,13 @@
       <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
     </radialGradient>
   </defs>
+  <!-- Full-bleed background; safe area = центральные 80% (Android maskable) -->
   <rect width="512" height="512" rx="112" fill="url(#g)"/>
   <rect width="512" height="512" rx="112" fill="url(#hi)"/>
-  <circle cx="256" cy="256" r="135" fill="none" stroke="white" stroke-width="34" opacity="0.97"/>
-  <line x1="256" y1="256" x2="256" y2="155" stroke="white" stroke-width="34" stroke-linecap="round"/>
-  <line x1="256" y1="256" x2="328" y2="256" stroke="white" stroke-width="34" stroke-linecap="round"/>
-  <circle cx="256" cy="256" r="20" fill="white"/>
+  <!-- Clock in safe-area circle r=205, content well inside -->
+  <circle cx="256" cy="256" r="100" fill="none" stroke="white" stroke-width="26" opacity="0.97"/>
+  <line x1="256" y1="256" x2="256" y2="180" stroke="white" stroke-width="26" stroke-linecap="round"/>
+  <line x1="256" y1="256" x2="312" y2="256" stroke="white" stroke-width="26" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="15" fill="white"/>
 </svg>
 </body></html>
