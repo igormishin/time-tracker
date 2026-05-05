@@ -2,7 +2,7 @@
 // Кеширует HTML/JS/иконки чтобы PWA запускалось без сети.
 // API запросы (Supabase) НЕ перехватываем — они идут напрямую.
 
-const CACHE = 'tracker-v3';
+const CACHE = 'tracker-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -26,6 +26,27 @@ self.addEventListener('activate', (e) => {
       .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+// Клик по уведомлению (включая action "Стоп") — пробрасываем в открытое окно
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const action = e.action; // '' | 'stop'
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (action === 'stop') {
+      if (all.length > 0) {
+        all.forEach(c => c.postMessage({ type: 'stop-active' }));
+        all[0].focus().catch(() => {});
+      } else {
+        // Нет открытого клиента — открываем PWA с маркером
+        await self.clients.openWindow('./?stop=1');
+      }
+    } else {
+      if (all.length > 0) all[0].focus().catch(() => {});
+      else await self.clients.openWindow('./');
+    }
+  })());
 });
 
 self.addEventListener('fetch', (e) => {
