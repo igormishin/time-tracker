@@ -62,7 +62,7 @@
   /* Layout */
   .app {
     max-width: 680px; margin: 0 auto;
-    padding: calc(env(safe-area-inset-top) + 12px) 14px calc(72px + env(safe-area-inset-bottom));
+    padding: calc(env(safe-area-inset-top) + 24px) 14px calc(72px + env(safe-area-inset-bottom));
   }
   header, .header-actions, .icon-btn { display: none !important; }
 
@@ -797,98 +797,7 @@ function tick() {
 
   // Live timeline tick
   if (currentTab === 'track' && Math.floor(ms / 1000) % 5 === 0) renderTimeline();
-  // Обновление уведомления в шторке (раз в минуту)
-  showActiveNotif();
 }
-
-/* ---------- Notifications (active timer in shade) ---------- */
-let lastNotifMinute = -1;
-
-async function ensureNotifPermission() {
-  if (!('Notification' in window)) return false;
-  if (Notification.permission === 'granted') return true;
-  if (Notification.permission === 'denied') return false;
-  try {
-    const r = await Notification.requestPermission();
-    return r === 'granted';
-  } catch { return false; }
-}
-
-async function showActiveNotif(force = false) {
-  if (!state.active) return;
-  if (!('serviceWorker' in navigator)) return;
-  if (Notification.permission !== 'granted') return;
-  const c = catById(state.active.catId);
-  if (!c) return;
-  const ms = Date.now() - new Date(state.active.start).getTime();
-  const minutes = Math.floor(ms / 60000);
-  if (!force && minutes === lastNotifMinute) return;
-  lastNotifMinute = minutes;
-  const limit = state.warnMinutes || 25;
-  const warn = minutes >= limit;
-  try {
-    const reg = await navigator.serviceWorker.ready;
-    const clock = fmtClock(ms);
-    // Время в title (он жирный), категория во второй строке
-    const title = warn ? `⚠ ${clock}  ·  ${c.name}` : `${clock}  ·  ${c.name}`;
-    const body = warn ? 'Пора переключаться' : 'Идёт трекер';
-    await reg.showNotification(title, {
-      body,
-      tag: 'tracker-active',
-      icon: 'icons/app-icon-v3-192.png',
-      badge: 'icons/app-icon-v3-192.png',
-      silent: !warn,
-      renotify: warn && minutes === limit,
-      requireInteraction: true,
-      actions: [{ action: 'stop', title: 'Стоп' }],
-      timestamp: new Date(state.active.start).getTime(),
-    });
-  } catch (e) { console.warn('showNotif:', e); }
-}
-
-async function clearActiveNotif() {
-  lastNotifMinute = -1;
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    const reg = await navigator.serviceWorker.ready;
-    const notes = await reg.getNotifications({ tag: 'tracker-active' });
-    notes.forEach(n => n.close());
-  } catch {}
-}
-
-// SW сообщает о клике по action "Стоп"
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'stop-active') {
-      if (state.active) toggleCategory(state.active.catId);
-    }
-  });
-}
-
-// Когда юзер сворачивает PWA — принудительно пересоздаём уведомление
-// (Android закрывает его при тапе на тело — пересоздаём, чтобы держалось пока таймер идёт)
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state.active) showActiveNotif(true);
-  if (!document.hidden && state.active) showActiveNotif(true);
-});
-
-// Если PWA открылась через ?stop=1 (не было открытых окон при тапе на Стоп)
-(function handleStopParam() {
-  try {
-    const u = new URL(location.href);
-    if (u.searchParams.get('stop') === '1') {
-      // Подождём пока state загрузится
-      const tryStop = () => {
-        if (session && state.active) { toggleCategory(state.active.catId); return true; }
-        return false;
-      };
-      const poll = setInterval(() => { if (tryStop()) clearInterval(poll); }, 200);
-      setTimeout(() => clearInterval(poll), 5000);
-      // Чистим query чтоб при перезагрузке не сработало снова
-      history.replaceState({}, '', u.pathname);
-    }
-  } catch {}
-})();
 
 /* ---------- Tracker actions ---------- */
 function toggleCategory(catId) {
@@ -922,13 +831,6 @@ function toggleCategory(catId) {
     }});
   }
   if (currentTab === 'history') renderHistory();
-  // Уведомление в шторке
-  if (state.active) {
-    if (!wasActive) ensureNotifPermission().then(ok => { if (ok) showActiveNotif(true); });
-    else showActiveNotif(true);
-  } else {
-    clearActiveNotif();
-  }
 }
 
 /* ---------- Stats ---------- */
@@ -1276,17 +1178,13 @@ async function applySession(s) {
       // 1. Мгновенный рендер из кэша если есть
       if (loadCache()) renderGrid();
       updateQueueBadge();
-      // Сразу показываем уведомление в шторке из закэшированного активного таймера
-      if (state.active) showActiveNotif(true);
-      // 1.5. Если есть pending — гоняем их в фоне, не блокируя загрузку
+      // Если есть pending — гоняем их в фоне, не блокируя загрузку
       if (queue.length > 0) processQueue();
       // 2. Фоновое обновление с сервера
       await loadAll();
       saveCache();
       setupRealtime();
       renderGrid();
-      if (state.active) showActiveNotif(true);
-      else clearActiveNotif();
       // Диагностика: если данные пустые — показываем баннер
       const diag = document.getElementById('diag-banner');
       if (diag) {
