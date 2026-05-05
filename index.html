@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#08090c" />
+<title>Time Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* Linear-inspired tokens */
+  :root {
+    --bg: #08090c;
+    --surface: #101114;
+    --surface-2: #16181d;
+    --border: rgba(255,255,255,0.06);
+    --border-strong: rgba(255,255,255,0.12);
+    --text: #ededee;
+    --text-strong: #fafafa;
+    --muted: #8a8a93;
+    --muted-2: #5b5d66;
+    --danger: #f43f5e;
+    --accent: #5e6ad2;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: transparent; }
+  input, select { font: inherit; color: inherit; background: var(--surface);
+    border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 11px; outline: none; width: 100%; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+
+  /* Layout */
+  .app { max-width: 680px; margin: 0 auto; padding: 20px 18px 96px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 22px; }
+  header h1 {
+    margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.015em; color: var(--text-strong);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  header h1::before {
+    content: ''; width: 18px; height: 18px; border-radius: 5px;
+    background: linear-gradient(135deg, #5e6ad2 0%, #8b5cf6 100%);
+    box-shadow: 0 0 12px rgba(94,106,210,0.4);
+  }
+  .header-actions { display: flex; gap: 6px; }
+  .icon-btn { width: 32px; height: 32px; border-radius: 7px; background: transparent;
+    display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
+    border: 1px solid transparent; transition: background .15s, color .15s; }
+  .icon-btn:hover { background: var(--surface); color: var(--text); }
+
+  /* Tabs — Linear underline style */
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border); margin-bottom: 22px; padding: 0 2px; }
+  .tab { padding: 10px 0 12px; font-size: 13.5px; color: var(--muted); position: relative; font-weight: 500;
+    transition: color .15s; letter-spacing: -0.005em; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text-strong); }
+  .tab.active::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: var(--text-strong); border-radius: 1px;
+  }
+
+  /* ===== Active timer card ===== */
+  .now {
+    position: relative;
+    background: linear-gradient(180deg, var(--surface) 0%, #0f1117 100%);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px 20px 18px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color .3s ease, box-shadow .3s ease;
+  }
+  .now::before {
+    content: ''; position: absolute; left: 50%; top: -60%;
+    width: 120%; height: 140%; transform: translateX(-50%);
+    background: radial-gradient(ellipse at center, var(--c, transparent) 0%, transparent 60%);
+    opacity: 0; transition: opacity .4s ease; pointer-events: none;
+  }
+  .now-row { position: relative; display: flex; align-items: center; gap: 10px; }
+  .now-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none;
+    transition: background .25s, box-shadow .25s;
+  }
+  .now-name { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+  .now-sub { color: var(--muted); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
+  .now-time {
+    position: relative;
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 300;
+    font-size: clamp(64px, 18vw, 108px);
+    letter-spacing: -0.06em;
+    text-align: center;
+    line-height: 1;
+    margin: 18px 0 10px;
+    color: var(--text);
+  }
+  .now-meta {
+    position: relative; display: flex; justify-content: space-between; align-items: center;
+    color: var(--muted); font-size: 11px; padding: 0 4px;
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;
+  }
+  .now-meta .v { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; text-transform: none; letter-spacing: 0; }
+
+  .now.idle .now-time { color: var(--muted); opacity: 0.35; }
+  .now.idle .now-meta { display: none; }
+
+  /* RUNNING */
+  .now.running {
+    border-color: color-mix(in srgb, var(--c) 50%, var(--border) 50%);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 25%, transparent),
+                0 24px 60px -24px color-mix(in srgb, var(--c) 50%, transparent);
+  }
+  .now.running::before { opacity: 0.18; }
+  .now.running .now-dot {
+    background: var(--c);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent),
+                0 0 12px color-mix(in srgb, var(--c) 80%, transparent);
+    animation: pulse-dot 1.6s ease-in-out infinite;
+  }
+  .now.running .now-time {
+    color: #fff;
+    text-shadow: 0 0 40px color-mix(in srgb, var(--c) 60%, transparent);
+  }
+  @keyframes pulse-dot { 0%,100% { transform: scale(1); } 50% { transform: scale(0.65); opacity: 0.85; } }
+
+  .now-stop {
+    margin-top: 16px; width: 100%; padding: 13px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-weight: 500; font-size: 14px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .15s, border-color .15s;
+  }
+  .now-stop::before {
+    content: ''; width: 10px; height: 10px; border-radius: 2px; background: currentColor;
+  }
+  .now-stop:hover { background: var(--surface-2); border-color: var(--muted); }
+
+  /* WARN */
+  .now.warn {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.5), 0 24px 60px -20px rgba(239,68,68,0.55);
+    animation: warn-pulse 2s ease-in-out infinite;
+  }
+  .now.warn::before {
+    background: radial-gradient(ellipse at center, #ef4444 0%, transparent 60%);
+    opacity: 0.22;
+  }
+  .now.warn .now-dot {
+    background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239,68,68,0.25), 0 0 14px rgba(239,68,68,0.7);
+  }
+  .now.warn .now-sub { color: #fca5a5; }
+  @keyframes warn-pulse {
+    0%,100% { box-shadow: 0 0 0 1px rgba(239,68,68,0.5), 0 24px 60px -20px rgba(239,68,68,0.55); }
+    50%     { box-shadow: 0 0 0 3px rgba(239,68,68,0.3),  0 28px 72px -16px rgba(239,68,68,0.75); }
+  }
+
+  /* Categories — Linear-style rows with color accent bar */
+  .grid { display: flex; flex-direction: column; gap: 6px; }
+  .cat {
+    position: relative;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 13px 16px 13px 22px;
+    display: flex; align-items: center; gap: 12px;
+    text-align: left;
+    color: var(--text);
+    transition: background .15s, border-color .15s, transform .08s;
+    overflow: hidden;
+    min-height: 60px;
+  }
+  .cat::before {
+    content: ''; position: absolute;
+    left: 8px; top: 14px; bottom: 14px;
+    width: 3px; border-radius: 2px;
+    background: var(--c);
+    transition: box-shadow .25s, top .25s, bottom .25s;
+  }
+  .cat:hover { background: var(--surface-2); border-color: var(--border-strong); }
+  .cat:active { transform: scale(0.997); }
+  .cat-text { flex: 1; min-width: 0; }
+  .cat-name {
+    font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
+  }
+  .cat-today { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -0.005em; }
+  .cat-time {
+    font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500;
+    color: var(--muted); letter-spacing: -0.02em;
+    font-feature-settings: "tnum";
+  }
+  .cat.active {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--c) 13%, var(--surface)) 0%, var(--surface) 70%);
+    border-color: color-mix(in srgb, var(--c) 35%, var(--border-strong));
+  }
+  .cat.active::before {
+    top: 8px; bottom: 8px;
+    box-shadow: 0 0 14px var(--c), 0 0 4px var(--c);
+  }
+  .cat.active .cat-name { color: var(--text-strong); }
+  .cat.active .cat-time { color: var(--text-strong); font-weight: 600; font-size: 15px; }
+  .cat.active .cat-today { color: color-mix(in srgb, var(--c) 70%, white 30%); }
+
+  /* Section title */
+  .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted-2); margin: 22px 2px 10px; }
+
+  /* Stats */
+  .stats { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .range-switch {
+    display: flex; gap: 2px; background: var(--surface-2);
+    padding: 3px; border-radius: 8px; margin-bottom: 16px;
+    border: 1px solid var(--border);
+  }
+  .range-switch button {
+    flex: 1; padding: 7px; border-radius: 6px; font-size: 12.5px; color: var(--muted);
+    font-weight: 500; letter-spacing: -0.005em; transition: background .15s, color .15s;
+  }
+  .range-switch button:hover { color: var(--text); }
+  .range-switch button.active { background: var(--bg); color: var(--text-strong); box-shadow: 0 1px 0 rgba(255,255,255,0.04); }
+  .stats-total {
+    font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 16px;
+    font-variant-numeric: tabular-nums; color: var(--text-strong);
+  }
+  .stats-row { display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center; padding: 7px 0; }
+  .stats-row .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .stats-row .name { font-size: 13.5px; color: var(--text); letter-spacing: -0.005em; }
+  .stats-row .val { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); letter-spacing: -0.01em; }
+  .stats-bar {
+    grid-column: 1 / -1; height: 4px; background: var(--surface-2);
+    border-radius: 2px; overflow: hidden; margin: 0 0 6px;
+  }
+  .stats-bar > div { height: 100%; border-radius: 2px; }
+  .stats-empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 13px; }
+
+  /* Timeline — 24h, Linear-style */
+  .timeline-card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px; margin-top: 18px; }
+  .timeline-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+  .timeline-head .title { font-size: 13px; font-weight: 600; color: var(--text-strong); letter-spacing: -0.01em; }
+  .timeline-head .total { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .timeline-track {
+    position: relative;
+    height: 32px;
+    border-radius: 6px;
+    background:
+      linear-gradient(90deg,
+        transparent 0%, transparent calc(25% - 1px),
+        var(--border-strong) calc(25% - 1px), var(--border-strong) 25%,
+        transparent 25%, transparent calc(50% - 1px),
+        var(--border-strong) calc(50% - 1px), var(--border-strong) 50%,
+        transparent 50%, transparent calc(75% - 1px),
+        var(--border-strong) calc(75% - 1px), var(--border-strong) 75%,
+        transparent 75%),
+      var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--border);
+    overflow: hidden;
+  }
+  .timeline-seg {
+    position: absolute; top: 0; bottom: 0;
+    background: var(--c);
+    transition: filter .15s ease;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--c) 50%, transparent);
+  }
+  .timeline-seg:hover { filter: brightness(1.2); }
+  .timeline-seg.active::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  .timeline-now {
+    position: absolute; top: -3px; bottom: -3px; width: 1.5px;
+    background: var(--text-strong); border-radius: 2px;
+    box-shadow: 0 0 0 1px var(--bg), 0 0 10px rgba(255,255,255,0.5);
+    pointer-events: none;
+  }
+  .timeline-now::before {
+    content: ''; position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+    width: 7px; height: 7px; border-radius: 50%; background: var(--text-strong);
+    box-shadow: 0 0 0 2px var(--bg), 0 0 8px rgba(255,255,255,0.6);
+  }
+  .timeline-axis {
+    position: relative; height: 18px; margin-top: 8px;
+    font-size: 10px; color: var(--muted-2); font-variant-numeric: tabular-nums;
+  }
+  .timeline-tick {
+    position: absolute; top: 0; transform: translateX(-50%);
+    letter-spacing: 0.04em; font-weight: 500;
+  }
+  .timeline-tick:not(.major)::before {
+    content: ''; position: absolute; left: 50%; top: -4px;
+    width: 1px; height: 3px; background: var(--border-strong);
+    transform: translateX(-50%);
+  }
+  .timeline-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px;
+    padding-top: 14px; border-top: 1px solid var(--border); }
+  .timeline-legend-item { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .timeline-legend-item .d { width: 8px; height: 8px; border-radius: 2px; }
+  .timeline-legend-item .v { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -0.01em; }
+  .timeline-empty { color: var(--muted); text-align: center; font-size: 12.5px; padding: 4px 0 0; width: 100%; }
+
+  /* History list */
+  .entry { display: flex; align-items: center; gap: 12px; padding: 11px 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px; margin-bottom: 4px;
+    transition: background .15s, border-color .15s; }
+  .entry:hover { background: var(--surface-2); border-color: var(--border-strong); }
+  .entry .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .entry .info { flex: 1; min-width: 0; }
+  .entry .info .n { font-size: 13.5px; font-weight: 500; color: var(--text); letter-spacing: -0.005em; }
+  .entry .info .t { color: var(--muted); font-size: 11.5px; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .entry .dur { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text); font-weight: 500; }
+  .entry .menu { padding: 4px 8px; border-radius: 6px; color: var(--muted-2); font-size: 14px; }
+  .entry .menu:hover { background: var(--bg); color: var(--text); }
+  .day-header { font-size: 11px; color: var(--muted-2); text-transform: uppercase;
+    letter-spacing: 0.08em; margin: 18px 2px 8px; font-weight: 600; }
+  .day-header span { float: right; font-variant-numeric: tabular-nums; color: var(--muted); letter-spacing: -0.01em; text-transform: none; }
+
+  /* Settings list */
+  .cat-list { display: flex; flex-direction: column; gap: 6px; }
+  .cat-row { display: flex; align-items: center; gap: 10px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .cat-row input[type="text"] { flex: 1; background: transparent; border: 0; padding: 4px 0; font-size: 13.5px; }
+  .cat-row input[type="text"]:focus { box-shadow: none; }
+  .cat-row input[type="color"] { width: 28px; height: 28px; border: 1px solid var(--border-strong); padding: 0; background: transparent;
+    border-radius: 6px; overflow: hidden; cursor: pointer; flex: none; }
+  .cat-row .del { color: var(--muted-2); padding: 6px 8px; border-radius: 6px; font-size: 14px; }
+  .cat-row .del:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+  .add-cat { background: transparent; border: 1px dashed var(--border-strong); border-radius: 8px;
+    padding: 11px; color: var(--muted); width: 100%; text-align: center; font-size: 13px; margin-top: 6px;
+    transition: color .15s, border-color .15s; }
+  .add-cat:hover { color: var(--text); border-color: var(--muted); }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 100; padding: 0; }
+  @media (min-width: 560px) { .modal-bg { align-items: center; padding: 16px; } }
+  .modal { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 16px 16px 0 0;
+    width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; padding: 22px;
+    box-shadow: 0 -20px 60px -10px rgba(0,0,0,0.5); }
+  @media (min-width: 560px) { .modal { border-radius: 16px; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.6); } }
+  .modal-title { font-size: 16px; font-weight: 600; margin: 0 0 18px; display: flex;
+    align-items: center; justify-content: space-between; letter-spacing: -0.01em; color: var(--text-strong); }
+  .modal-title button { color: var(--muted); padding: 4px 8px; font-size: 13px; border-radius: 6px; }
+  .modal-title button:hover { background: var(--surface-2); color: var(--text); }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; letter-spacing: -0.005em; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn {
+    width: 100%; padding: 11px; border-radius: 8px; background: var(--accent); color: #fff;
+    font-weight: 500; font-size: 14px; margin-top: 6px; letter-spacing: -0.005em;
+    transition: filter .15s, background .15s; border: 1px solid color-mix(in srgb, var(--accent) 60%, black);
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); }
+  .btn.secondary:hover { background: var(--bg); filter: none; }
+  .btn.danger { background: var(--danger); border-color: color-mix(in srgb, var(--danger) 60%, black); }
+
+  /* Login gate */
+  .gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center;
+    justify-content: center; z-index: 200; padding: 24px; }
+  .gate-card { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px; }
+  .gate-card h2 { margin: 0 0 6px; }
+  .gate-card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate hidden">
+  <form class="gate-card" onsubmit="event.preventDefault(); sendMagicLink();">
+    <h2 style="display:flex; align-items:center; gap:8px;">
+      <span style="width:18px; height:18px; border-radius:5px; background:linear-gradient(135deg,#5e6ad2 0%,#8b5cf6 100%); box-shadow:0 0 12px rgba(94,106,210,0.4);"></span>
+      Time Tracker
+    </h2>
+    <p>Введи email — придёт ссылка для входа.</p>
+    <input id="gate-email" type="email" autocomplete="email" placeholder="you@example.com" required />
+    <button class="btn" type="submit" id="gate-submit" style="margin-top:10px;">Получить ссылку</button>
+    <p id="gate-status" style="color:var(--muted); margin:12px 0 0; font-size:13px; min-height:18px;"></p>
+  </form>
+</div>
+
+<div class="app hidden" id="app">
+  <header>
+    <h1>Tracker</h1>
+    <div class="header-actions">
+      <button class="icon-btn" title="Настройки" onclick="openSettings()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="track" onclick="switchTab('track')">Трекер</button>
+    <button class="tab" data-tab="stats" onclick="switchTab('stats')">Статистика</button>
+    <button class="tab" data-tab="history" onclick="switchTab('history')">История</button>
+  </div>
+
+  <!-- TRACK TAB -->
+  <section id="tab-track">
+    <div id="now" class="now idle">
+      <div class="now-row">
+        <div class="now-dot" id="now-dot" style="background: var(--muted);"></div>
+        <div style="flex:1; min-width:0;">
+          <div class="now-name" id="now-name">Нет активного трекера</div>
+          <div class="now-sub" id="now-sub">Нажми категорию, чтобы запустить</div>
+        </div>
+        <div class="now-time" id="now-time-idle">00:00:00</div>
+      </div>
+      <div class="now-time" id="now-time" style="display:none;">00:00:00</div>
+      <button class="now-stop" id="now-stop" style="display:none;" onclick="stopActive()">Остановить</button>
+    </div>
+
+    <div class="grid" id="cat-grid"></div>
+
+    <div class="timeline-card">
+      <div class="timeline-head">
+        <div class="title">Сегодня</div>
+        <div class="total" id="timeline-total">—</div>
+      </div>
+      <div class="timeline-track" id="timeline-track"></div>
+      <div class="timeline-axis" id="timeline-axis"></div>
+      <div class="timeline-legend" id="timeline-legend"></div>
+    </div>
+
+    <div class="stats" style="margin-top: 12px;">
+      <div id="today-stats-list"></div>
+    </div>
+  </section>
+
+  <!-- STATS TAB -->
+  <section id="tab-stats" class="hidden">
+    <div class="range-switch">
+      <button class="active" data-range="day" onclick="setRange('day')">Сегодня</button>
+      <button data-range="week" onclick="setRange('week')">Неделя</button>
+      <button data-range="month" onclick="setRange('month')">Месяц</button>
+    </div>
+    <div class="stats">
+      <div class="stats-total" id="stats-total">0ч 0м</div>
+      <div id="stats-list"></div>
+    </div>
+  </section>
+
+  <!-- HISTORY TAB -->
+  <section id="tab-history" class="hidden">
+    <div id="history-list"></div>
+  </section>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="modal-bg hidden" onclick="if(event.target===this) closeSettings()">
+  <div class="modal">
+    <h3 class="modal-title">Настройки <button onclick="closeSettings()">Закрыть</button></h3>
+
+    <div class="section-title" style="margin-top:0">Категории</div>
+    <div class="cat-list" id="settings-cats"></div>
+    <button class="add-cat" onclick="addCategory()">+ Добавить категорию</button>
+
+    <div class="section-title">Предупреждение о переключении</div>
+    <div class="field">
+      <label>Через сколько минут подсветить таймер красным</label>
+      <input id="set-warn-minutes" type="number" min="1" max="240" step="1" />
+    </div>
+    <button class="btn secondary" onclick="saveWarnMinutes()">Сохранить</button>
+
+    <div class="section-title">Аккаунт</div>
+    <div class="field" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px;">
+      <span id="user-email" style="font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis;"></span>
+      <button class="btn secondary" style="width:auto; margin:0; padding:6px 12px; font-size:12px;" onclick="logout()">Выйти</button>
+    </div>
+
+    <div class="section-title">Данные</div>
+    <button class="btn secondary" onclick="exportData()">Экспорт JSON</button>
+  </div>
+</div>
+
+<!-- Edit entry modal -->
+<div id="edit-modal" class="modal-bg hidden" onclick="if(event.target===this) closeEdit()">
+  <div class="modal">
+    <h3 class="modal-title">Редактировать запись <button onclick="closeEdit()">Закрыть</button></h3>
+    <div class="field">
+      <label>Категория</label>
+      <select id="edit-cat"></select>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Начало</label>
+        <input id="edit-start" type="datetime-local" step="1" />
+      </div>
+      <div class="field">
+        <label>Конец</label>
+        <input id="edit-end" type="datetime-local" step="1" />
+      </div>
+    </div>
+    <button class="btn" onclick="saveEdit()">Сохранить</button>
+    <button class="btn danger" onclick="deleteEntry()">Удалить</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* =========================================================
+   Time Tracker — Supabase backend
+   ========================================================= */
+
+const SUPABASE_URL = 'https://rdotiwxihcolalrjihtb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_jwMKkQlSbir80377fFi-fA_Vbf3uUFz';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
+
+let session = null;
+let realtime = null;
+let syncTimer = null;
+
+let state = {
+  categories: [],
+  entries: [],     // {id, catId, start, end}
+  active: null,    // {id, catId, start}
+  warnMinutes: 25,
+};
+
+let currentTab = 'track';
+let currentRange = 'day';
+let editingEntryId = null;
+let tickInterval = null;
+
+/* ---------- Helpers ---------- */
+const newId = () => (crypto?.randomUUID?.() || 'id-' + Date.now() + Math.random().toString(36).slice(2));
+const now = () => new Date().toISOString();
+const fmtDur = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}ч ${m}м`;
+  if (m > 0) return `${m}м`;
+  return `${sec}с`;
+};
+const fmtClock = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = String(Math.floor(s / 3600)).padStart(2, '0');
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const sec = String(s % 60).padStart(2, '0');
+  return `${h}:${m}:${sec}`;
+};
+const catById = (id) => state.categories.find(c => c.id === id);
+
+function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function startOfWeek(d) {
+  const x = startOfDay(d);
+  const day = (x.getDay() + 6) % 7; // понедельник = 0
+  x.setDate(x.getDate() - day);
+  return x;
+}
+function startOfMonth(d) { const x = startOfDay(d); x.setDate(1); return x; }
+
+/* Calculate ms within entry that overlaps [from, to] */
+function overlapMs(entry, from, to, end = null) {
+  const s = new Date(entry.start).getTime();
+  const e = (entry.end ? new Date(entry.end) : (end || new Date())).getTime();
+  const a = Math.max(s, from.getTime());
+  const b = Math.min(e, to.getTime());
+  return Math.max(0, b - a);
+}
+
+/* Aggregate per-category ms over a range (includes active entry) */
+function aggregate(from, to) {
+  const totals = {};
+  state.categories.forEach(c => totals[c.id] = 0);
+  state.entries.forEach(e => {
+    if (totals[e.catId] === undefined) totals[e.catId] = 0;
+    totals[e.catId] += overlapMs(e, from, to);
+  });
+  if (state.active) {
+    const e = { catId: state.active.catId, start: state.active.start, end: null };
+    if (totals[e.catId] === undefined) totals[e.catId] = 0;
+    totals[e.catId] += overlapMs(e, from, to);
+  }
+  return totals;
+}
+
+/* ---------- Render: Track ---------- */
+function renderGrid() {
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = '';
+  const todayFrom = startOfDay(new Date());
+  const todayTo = new Date();
+  const todayTotals = aggregate(todayFrom, todayTo);
+
+  state.categories.forEach(c => {
+    const isActive = state.active && state.active.catId === c.id;
+    const btn = document.createElement('button');
+    btn.className = 'cat' + (isActive ? ' active' : '');
+    btn.style.setProperty('--c', c.color);
+    btn.onclick = () => toggleCategory(c.id);
+    const todayMs = todayTotals[c.id] || 0;
+    btn.innerHTML = `
+      <div class="cat-text">
+        <div class="cat-name">${escapeHtml(c.name)}</div>
+        <div class="cat-today">${isActive ? 'идёт · ' : ''}${todayMs > 0 ? fmtDur(todayMs) + ' сегодня' : 'не запускалась сегодня'}</div>
+      </div>
+      <div class="cat-time" ${isActive ? `id="cat-running-${c.id}"` : ''}>${isActive ? '00:00:00' : (todayMs > 0 ? fmtDur(todayMs) : '')}</div>
+    `;
+    grid.appendChild(btn);
+  });
+
+  renderNow();
+  renderTimeline();
+}
+
+/* ---------- Timeline (today, smart range) ---------- */
+function renderTimeline() {
+  const track = document.getElementById('timeline-track');
+  const axis = document.getElementById('timeline-axis');
+  const legend = document.getElementById('timeline-legend');
+  const totalEl = document.getElementById('timeline-total');
+  if (!track) return;
+
+  const dayStart = startOfDay(new Date());
+  const dayEnd = new Date(dayStart.getTime() + 86400000);
+  const nowDate = new Date();
+
+  // Сегодняшние сегменты (entries + active)
+  const segs = [];
+  state.entries.forEach(e => {
+    const s = new Date(e.start), en = new Date(e.end);
+    if (en <= dayStart || s >= dayEnd) return;
+    segs.push({ catId: e.catId, start: Math.max(s, dayStart), end: Math.min(en, dayEnd) });
+  });
+  if (state.active) {
+    const s = new Date(state.active.start);
+    const en = nowDate;
+    if (en > dayStart && s < dayEnd) {
+      segs.push({ catId: state.active.catId, start: Math.max(s, dayStart), end: Math.min(en, dayEnd), active: true });
+    }
+  }
+
+  // Полные сутки: 00:00 — 24:00
+  const viewStart = dayStart;
+  const viewEnd = dayEnd;
+  const viewSpan = viewEnd - viewStart;
+  const pct = (t) => ((t - viewStart) / viewSpan) * 100;
+
+  // Сегменты
+  track.innerHTML = '';
+  const totals = {};
+  segs.forEach(s => {
+    const c = catById(s.catId);
+    if (!c) return;
+    const left = pct(s.start);
+    const width = pct(s.end) - left;
+    if (width <= 0) return;
+    const div = document.createElement('div');
+    div.className = 'timeline-seg' + (s.active ? ' active' : '');
+    div.style.cssText = `left:${left}%; width:${width}%; --c:${c.color}`;
+    const dur = (s.end - s.start);
+    div.title = `${c.name} · ${fmtTime(new Date(s.start))}–${s.active ? 'сейчас' : fmtTime(new Date(s.end))} · ${fmtDur(dur)}`;
+    track.appendChild(div);
+    totals[s.catId] = (totals[s.catId] || 0) + dur;
+  });
+
+  // "Сейчас" маркер (только если nowDate в окне)
+  if (nowDate >= viewStart && nowDate <= viewEnd) {
+    const nowMark = document.createElement('div');
+    nowMark.className = 'timeline-now';
+    nowMark.style.left = `calc(${pct(nowDate)}% - 1px)`;
+    track.appendChild(nowMark);
+  }
+
+  // Ось часов: 24h → тики каждые 3 часа, с лейблом каждые 6
+  axis.innerHTML = '';
+  for (let h = 0; h <= 24; h += 3) {
+    const t = new Date(dayStart.getTime() + h * 3600000);
+    const tick = document.createElement('div');
+    tick.className = 'timeline-tick' + (h % 6 === 0 ? ' major' : '');
+    tick.style.left = pct(t) + '%';
+    if (h % 6 === 0) {
+      tick.textContent = h === 24 ? '24' : String(h).padStart(2, '0');
+    }
+    axis.appendChild(tick);
+  }
+
+  // Легенда: только категории с временем сегодня
+  legend.innerHTML = '';
+  const dayTotal = Object.values(totals).reduce((a, b) => a + b, 0);
+  totalEl.textContent = dayTotal > 0 ? fmtDur(dayTotal) : '—';
+  state.categories
+    .filter(c => totals[c.id])
+    .sort((a, b) => totals[b.id] - totals[a.id])
+    .forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'timeline-legend-item';
+      item.innerHTML = `<div class="d" style="background:${c.color}"></div><span>${escapeHtml(c.name)}</span> <span class="v">${fmtDur(totals[c.id])}</span>`;
+      legend.appendChild(item);
+    });
+  if (dayTotal === 0) {
+    legend.innerHTML = '<div class="timeline-empty" style="width:100%">Сегодня ещё ничего не трекалось</div>';
+  }
+
+  // Bars + text под таймлайном
+  renderTodayStats(totals, dayTotal);
+}
+
+function renderTodayStats(totals, dayTotal) {
+  const list = document.getElementById('today-stats-list');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!dayTotal) {
+    list.innerHTML = '<div class="stats-empty">Запусти трекер, чтобы увидеть статистику</div>';
+    return;
+  }
+  state.categories
+    .map(c => ({ c, ms: totals[c.id] || 0 }))
+    .filter(x => x.ms > 0)
+    .sort((a, b) => b.ms - a.ms)
+    .forEach(({ c, ms }) => {
+      const pct = (ms / dayTotal) * 100;
+      const row = document.createElement('div');
+      row.className = 'stats-row';
+      row.innerHTML = `
+        <div class="dot" style="background:${c.color}"></div>
+        <div class="name">${escapeHtml(c.name)}</div>
+        <div class="val">${fmtDur(ms)} · ${pct.toFixed(0)}%</div>
+        <div class="stats-bar"><div style="width:${pct}%; background:${c.color}"></div></div>
+      `;
+      list.appendChild(row);
+    });
+}
+
+function renderNow() {
+  const nowEl = document.getElementById('now');
+  const bigTime = document.getElementById('now-time');
+  const idleTime = document.getElementById('now-time-idle');
+  const stopBtn = document.getElementById('now-stop');
+  if (state.active) {
+    const c = catById(state.active.catId);
+    if (!c) { state.active = null; renderNow(); return; }
+    nowEl.classList.remove('idle');
+    nowEl.classList.add('running');
+    nowEl.style.setProperty('--c', c.color);
+    document.getElementById('now-dot').style.background = c.color;
+    document.getElementById('now-name').textContent = c.name;
+    document.getElementById('now-sub').textContent = 'идёт';
+    bigTime.style.display = '';
+    idleTime.style.display = 'none';
+    stopBtn.style.display = '';
+    tick();
+  } else {
+    nowEl.classList.add('idle');
+    nowEl.classList.remove('running', 'warn');
+    document.getElementById('now-dot').style.background = 'var(--muted)';
+    document.getElementById('now-name').textContent = 'Нет активного трекера';
+    document.getElementById('now-sub').textContent = 'Нажми категорию, чтобы запустить';
+    bigTime.style.display = 'none';
+    idleTime.style.display = '';
+    idleTime.textContent = '00:00:00';
+    stopBtn.style.display = 'none';
+  }
+}
+
+function stopActive() {
+  if (!state.active) return;
+  toggleCategory(state.active.catId);
+}
+
+function tick() {
+  if (!state.active) return;
+  const ms = Date.now() - new Date(state.active.start).getTime();
+  const clock = fmtClock(ms);
+  document.getElementById('now-time').textContent = clock;
+  const inGrid = document.getElementById('cat-running-' + state.active.catId);
+  if (inGrid) inGrid.textContent = clock;
+
+  // Warning state after threshold
+  const limitMs = (state.warnMinutes || 25) * 60 * 1000;
+  const nowEl = document.getElementById('now');
+  const sub = document.getElementById('now-sub');
+  if (ms >= limitMs) {
+    if (!nowEl.classList.contains('warn')) {
+      nowEl.classList.add('warn');
+      sub.textContent = `больше ${state.warnMinutes || 25} мин — пора переключаться`;
+    }
+  } else {
+    if (nowEl.classList.contains('warn')) {
+      nowEl.classList.remove('warn');
+      sub.textContent = 'идёт';
+    }
+  }
+
+  // Live timeline tick
+  if (currentTab === 'track' && Math.floor(ms / 1000) % 5 === 0) renderTimeline();
+}
+
+/* ---------- Tracker actions ---------- */
+async function toggleCategory(catId) {
+  if (!session) return;
+  const t = now();
+  const uid_ = session.user.id;
+  if (state.active) {
+    const wasSame = state.active.catId === catId;
+    const closingId = state.active.id;
+    const closingStart = state.active.start;
+    const closingCat = state.active.catId;
+    // Optimistic
+    state.entries.unshift({ id: closingId, catId: closingCat, start: closingStart, end: t });
+    state.active = null;
+    renderGrid();
+    const { error } = await sb.from('entries').update({ end_at: t }).eq('id', closingId);
+    if (error) { alert('Ошибка: ' + error.message); await loadAll(); renderGrid(); return; }
+    if (!wasSame) {
+      const id = newId();
+      state.active = { id, catId, start: t };
+      renderGrid();
+      const { error: e2 } = await sb.from('entries').insert({ id, user_id: uid_, category_id: catId, start_at: t });
+      if (e2) { alert('Ошибка: ' + e2.message); state.active = null; await loadAll(); renderGrid(); }
+    }
+  } else {
+    const id = newId();
+    state.active = { id, catId, start: t };
+    renderGrid();
+    const { error } = await sb.from('entries').insert({ id, user_id: uid_, category_id: catId, start_at: t });
+    if (error) { alert('Ошибка: ' + error.message); state.active = null; await loadAll(); renderGrid(); }
+  }
+  if (currentTab === 'history') renderHistory();
+}
+
+/* ---------- Stats ---------- */
+function setRange(r) {
+  currentRange = r;
+  document.querySelectorAll('.range-switch button').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === r);
+  });
+  renderStats();
+}
+function rangeBounds() {
+  const to = new Date();
+  let from;
+  if (currentRange === 'day') from = startOfDay(to);
+  else if (currentRange === 'week') from = startOfWeek(to);
+  else from = startOfMonth(to);
+  return { from, to };
+}
+function renderStats() {
+  const { from, to } = rangeBounds();
+  const totals = aggregate(from, to);
+  const totalMs = Object.values(totals).reduce((a,b) => a+b, 0);
+  document.getElementById('stats-total').textContent = totalMs > 0 ? fmtDur(totalMs) : '—';
+
+  const list = document.getElementById('stats-list');
+  list.innerHTML = '';
+  if (totalMs === 0) {
+    list.innerHTML = '<div class="stats-empty">Нет данных за период</div>';
+    return;
+  }
+  // Sort by ms desc
+  const sorted = state.categories
+    .map(c => ({ c, ms: totals[c.id] || 0 }))
+    .sort((a,b) => b.ms - a.ms);
+
+  sorted.forEach(({ c, ms }) => {
+    if (ms === 0) return;
+    const pct = totalMs > 0 ? (ms / totalMs * 100) : 0;
+    const row = document.createElement('div');
+    row.className = 'stats-row';
+    row.innerHTML = `
+      <div class="dot" style="background:${c.color}"></div>
+      <div class="name">${escapeHtml(c.name)}</div>
+      <div class="val">${fmtDur(ms)} · ${pct.toFixed(0)}%</div>
+      <div class="stats-bar"><div style="width:${pct}%; background:${c.color}"></div></div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+/* ---------- History ---------- */
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '';
+  if (!state.entries.length && !state.active) {
+    list.innerHTML = '<div class="stats-empty">Пока пусто</div>';
+    return;
+  }
+  // Группируем по дню (по дате старта)
+  const byDay = {};
+  const all = [...state.entries];
+  if (state.active) all.push({ id: '__active', catId: state.active.catId, start: state.active.start, end: null, _active: true });
+  all.sort((a,b) => new Date(b.start) - new Date(a.start));
+  all.forEach(e => {
+    const dKey = startOfDay(new Date(e.start)).toISOString();
+    (byDay[dKey] = byDay[dKey] || []).push(e);
+  });
+
+  Object.keys(byDay).forEach(dKey => {
+    const date = new Date(dKey);
+    const entries = byDay[dKey];
+    const dayTotal = entries.reduce((sum, e) => {
+      const end = e.end ? new Date(e.end) : new Date();
+      return sum + (end - new Date(e.start));
+    }, 0);
+    const header = document.createElement('div');
+    header.className = 'day-header';
+    header.innerHTML = `${formatDayHeader(date)} <span>${fmtDur(dayTotal)}</span>`;
+    list.appendChild(header);
+
+    entries.forEach(e => {
+      const c = catById(e.catId);
+      if (!c) return;
+      const start = new Date(e.start);
+      const end = e.end ? new Date(e.end) : new Date();
+      const dur = end - start;
+      const row = document.createElement('div');
+      row.className = 'entry';
+      row.innerHTML = `
+        <div class="dot" style="background:${c.color}"></div>
+        <div class="info">
+          <div class="n">${escapeHtml(c.name)}${e._active ? ' · идёт' : ''}</div>
+          <div class="t">${fmtTime(start)} – ${e._active ? 'сейчас' : fmtTime(end)}</div>
+        </div>
+        <div class="dur">${fmtDur(dur)}</div>
+        ${e._active ? '' : `<button class="menu" onclick="openEdit('${e.id}')" title="Редактировать">✎</button>`}
+      `;
+      list.appendChild(row);
+    });
+  });
+}
+
+function formatDayHeader(d) {
+  const today = startOfDay(new Date());
+  const that = startOfDay(d);
+  const diff = (today - that) / 86400000;
+  if (diff === 0) return 'Сегодня';
+  if (diff === 1) return 'Вчера';
+  return d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function fmtTime(d) {
+  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ---------- Edit entry ---------- */
+function openEdit(id) {
+  editingEntryId = id;
+  const e = state.entries.find(x => x.id === id);
+  if (!e) return;
+  const sel = document.getElementById('edit-cat');
+  sel.innerHTML = '';
+  state.categories.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id; opt.textContent = c.name;
+    if (c.id === e.catId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('edit-start').value = toLocalInput(new Date(e.start));
+  document.getElementById('edit-end').value = toLocalInput(new Date(e.end));
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+function closeEdit() {
+  document.getElementById('edit-modal').classList.add('hidden');
+  editingEntryId = null;
+}
+async function saveEdit() {
+  const e = state.entries.find(x => x.id === editingEntryId);
+  if (!e) return;
+  const s = new Date(document.getElementById('edit-start').value);
+  const en = new Date(document.getElementById('edit-end').value);
+  if (isNaN(s) || isNaN(en) || en <= s) { alert('Неверные даты'); return; }
+  const newCat = document.getElementById('edit-cat').value;
+  const start = s.toISOString();
+  const end = en.toISOString();
+  const { error } = await sb.from('entries').update({
+    category_id: newCat, start_at: start, end_at: end
+  }).eq('id', e.id);
+  if (error) { alert('Ошибка: ' + error.message); return; }
+  e.catId = newCat; e.start = start; e.end = end;
+  closeEdit();
+  renderHistory(); renderGrid();
+  if (currentTab === 'stats') renderStats();
+}
+async function deleteEntry() {
+  if (!confirm('Удалить запись?')) return;
+  const { error } = await sb.from('entries').delete().eq('id', editingEntryId);
+  if (error) { alert('Ошибка: ' + error.message); return; }
+  state.entries = state.entries.filter(x => x.id !== editingEntryId);
+  closeEdit();
+  renderHistory(); renderGrid();
+  if (currentTab === 'stats') renderStats();
+}
+function toLocalInput(d) {
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/* ---------- Settings ---------- */
+function openSettings() {
+  renderSettingsCats();
+  document.getElementById('set-warn-minutes').value = state.warnMinutes || 25;
+  if (session) document.getElementById('user-email').textContent = session.user.email;
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+async function saveWarnMinutes() {
+  const v = parseInt(document.getElementById('set-warn-minutes').value, 10);
+  if (!v || v < 1 || v > 240) { alert('Введи число от 1 до 240'); return; }
+  state.warnMinutes = v;
+  const { error } = await sb.from('settings').upsert({
+    user_id: session.user.id, warn_minutes: v, updated_at: new Date().toISOString()
+  });
+  if (error) { alert('Ошибка: ' + error.message); return; }
+  tick();
+  alert('Сохранено: ' + v + ' мин');
+}
+async function closeSettings() {
+  document.getElementById('settings-modal').classList.add('hidden');
+  await saveAllCategories();
+  renderGrid();
+  if (currentTab === 'stats') renderStats();
+  if (currentTab === 'history') renderHistory();
+}
+async function saveAllCategories() {
+  syncSettingsInputs();
+  if (!session || !state.categories.length) return;
+  const updates = state.categories.map((c, i) => ({
+    id: c.id, user_id: session.user.id, name: c.name, color: c.color, position: i
+  }));
+  const { error } = await sb.from('categories').upsert(updates);
+  if (error) console.error('saveAllCategories', error);
+}
+function renderSettingsCats() {
+  const list = document.getElementById('settings-cats');
+  list.innerHTML = '';
+  state.categories.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'cat-row';
+    row.innerHTML = `
+      <input type="color" value="${c.color}" data-i="${i}" data-field="color" />
+      <input type="text" value="${escapeAttr(c.name)}" data-i="${i}" data-field="name" />
+      <button class="del" title="Удалить" data-i="${i}">🗑</button>
+    `;
+    row.querySelector('.del').onclick = () => removeCategory(i);
+    list.appendChild(row);
+  });
+}
+function syncSettingsInputs() {
+  document.querySelectorAll('#settings-cats input').forEach(inp => {
+    const i = +inp.dataset.i;
+    const field = inp.dataset.field;
+    if (state.categories[i]) state.categories[i][field] = inp.value;
+  });
+}
+async function addCategory() {
+  await saveAllCategories();
+  const palette = ['#5e6ad2','#10b981','#f59e0b','#06b6d4','#ec4899','#a855f7','#f43f5e','#14b8a6','#eab308','#3b82f6','#84cc16'];
+  const used = new Set(state.categories.map(c => c.color.toLowerCase()));
+  const color = palette.find(p => !used.has(p.toLowerCase())) || palette[Math.floor(Math.random() * palette.length)];
+  const id = newId();
+  const position = state.categories.length;
+  const { error } = await sb.from('categories').insert({
+    id, user_id: session.user.id, name: 'Новая категория', color, position
+  });
+  if (error) { alert('Ошибка: ' + error.message); return; }
+  state.categories.push({ id, name: 'Новая категория', color, position });
+  renderSettingsCats();
+}
+async function removeCategory(i) {
+  syncSettingsInputs();
+  const c = state.categories[i];
+  if (!c) return;
+  const hasEntries = state.entries.some(e => e.catId === c.id);
+  const isActive = state.active && state.active.catId === c.id;
+  if (hasEntries || isActive) {
+    if (!confirm(`У категории "${c.name}" есть записи. Удалить категорию и все её записи?`)) return;
+  }
+  const { error } = await sb.from('categories').delete().eq('id', c.id);
+  if (error) { alert('Ошибка: ' + error.message); return; }
+  state.categories.splice(i, 1);
+  state.entries = state.entries.filter(e => e.catId !== c.id);
+  if (isActive) state.active = null;
+  renderSettingsCats();
+}
+
+/* ---------- Data import/export ---------- */
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `time-tracker-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+/* ---------- Tabs ---------- */
+function switchTab(t) {
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  document.getElementById('tab-track').classList.toggle('hidden', t !== 'track');
+  document.getElementById('tab-stats').classList.toggle('hidden', t !== 'stats');
+  document.getElementById('tab-history').classList.toggle('hidden', t !== 'history');
+  if (t === 'stats') renderStats();
+  if (t === 'history') renderHistory();
+  if (t === 'track') renderGrid();
+}
+
+/* ---------- Utils ---------- */
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+
+/* ---------- Auth ---------- */
+async function bootAuth() {
+  const { data: { session: s } } = await sb.auth.getSession();
+  await applySession(s);
+  sb.auth.onAuthStateChange(async (_event, ses) => { await applySession(ses); });
+}
+
+async function applySession(s) {
+  session = s;
+  const gate = document.getElementById('gate');
+  const app = document.getElementById('app');
+  if (s) {
+    gate.classList.add('hidden');
+    app.classList.remove('hidden');
+    document.getElementById('user-email').textContent = s.user.email;
+    await loadAll();
+    setupRealtime();
+    renderGrid();
+  } else {
+    gate.classList.remove('hidden');
+    app.classList.add('hidden');
+    if (realtime) { sb.removeChannel(realtime); realtime = null; }
+    state = { categories: [], entries: [], active: null, warnMinutes: 25 };
+  }
+}
+
+async function sendMagicLink() {
+  const email = document.getElementById('gate-email').value.trim();
+  const status = document.getElementById('gate-status');
+  const btn = document.getElementById('gate-submit');
+  if (!email) { status.textContent = 'Введи email'; status.style.color = 'var(--danger)'; return; }
+  btn.disabled = true; status.style.color = 'var(--muted)'; status.textContent = 'Отправка...';
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
+  btn.disabled = false;
+  if (error) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка: ' + error.message; }
+  else { status.style.color = '#10b981'; status.textContent = 'Письмо отправлено. Открой ссылку на этом устройстве.'; }
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  document.getElementById('settings-modal').classList.add('hidden');
+}
+
+/* ---------- Data load ---------- */
+async function loadAll() {
+  if (!session) return;
+  const [cats, ents, settings] = await Promise.all([
+    sb.from('categories').select('*').order('position'),
+    sb.from('entries').select('*').order('start_at', { ascending: false }).limit(5000),
+    sb.from('settings').select('*').maybeSingle()
+  ]);
+  if (cats.error)     console.error('categories:', cats.error);
+  if (ents.error)     console.error('entries:', ents.error);
+  if (settings.error) console.error('settings:', settings.error);
+
+  state.categories = (cats.data || []).map(c => ({
+    id: c.id, name: c.name, color: c.color, position: c.position
+  }));
+  state.entries = [];
+  state.active = null;
+  (ents.data || []).forEach(e => {
+    if (e.end_at === null) {
+      state.active = { id: e.id, catId: e.category_id, start: e.start_at };
+    } else {
+      state.entries.push({ id: e.id, catId: e.category_id, start: e.start_at, end: e.end_at });
+    }
+  });
+  state.warnMinutes = settings.data?.warn_minutes || 25;
+}
+
+function setupRealtime() {
+  if (realtime) sb.removeChannel(realtime);
+  realtime = sb.channel('user-data')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => syncSoon())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' },    () => syncSoon())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' },   () => syncSoon())
+    .subscribe();
+}
+function syncSoon() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    await loadAll();
+    if (currentTab === 'track')   renderGrid();
+    if (currentTab === 'stats')   renderStats();
+    if (currentTab === 'history') renderHistory();
+  }, 250);
+}
+
+/* ---------- Boot ---------- */
+bootAuth();
+tickInterval = setInterval(tick, 1000);
+setInterval(() => {
+  if (!session) return;
+  if (currentTab === 'track') renderGrid();
+  if (currentTab === 'stats') renderStats();
+}, 60_000);
+</script>
+</body>
+</html>
