@@ -6,7 +6,12 @@
 <meta name="theme-color" content="#08090c" />
 <title>Time Tracker</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%235e6ad2'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='8.5' fill='none' stroke='white' stroke-width='2.2' opacity='0.95'/%3E%3Cline x1='16' y1='16' x2='16' y2='9.5' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3Cline x1='16' y1='16' x2='20.5' y2='16' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='1.4' fill='white'/%3E%3C/svg%3E" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%235e6ad2'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='8.5' fill='none' stroke='white' stroke-width='2.2'/%3E%3Cline x1='16' y1='16' x2='16' y2='9.5' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3Cline x1='16' y1='16' x2='20.5' y2='16' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='1.4' fill='white'/%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Tracker" />
+<meta name="mobile-web-app-capable" content="yes" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -40,76 +45,83 @@
   input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 
   /* Layout */
-  .app { max-width: 680px; margin: 0 auto; padding: 20px 18px 96px; }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 22px; }
+  .app { max-width: 680px; margin: 0 auto; padding: 14px 14px calc(80px + env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 14px; }
   header h1 {
-    margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.015em; color: var(--text-strong);
-    display: inline-flex; align-items: center; gap: 8px;
+    margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-strong);
+    display: inline-flex; align-items: center; gap: 10px;
   }
   header h1::before {
-    content: ''; width: 18px; height: 18px; border-radius: 5px;
-    background: linear-gradient(135deg, #5e6ad2 0%, #8b5cf6 100%);
-    box-shadow: 0 0 12px rgba(94,106,210,0.4);
+    content: ''; width: 26px; height: 26px; border-radius: 7px;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35) 0%, transparent 50%),
+      linear-gradient(135deg, #5e6ad2 0%, #8b5cf6 60%, #ec4899 100%);
+    box-shadow: 0 0 14px rgba(94,106,210,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
   }
   .header-actions { display: flex; gap: 6px; }
-  .icon-btn { width: 32px; height: 32px; border-radius: 7px; background: transparent;
+  .icon-btn { width: 36px; height: 36px; border-radius: 8px; background: transparent;
     display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
     border: 1px solid transparent; transition: background .15s, color .15s; }
   .icon-btn:hover { background: var(--surface); color: var(--text); }
 
-  /* Tabs — Linear underline style */
-  .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border); margin-bottom: 22px; padding: 0 2px; }
-  .tab { padding: 10px 0 12px; font-size: 13.5px; color: var(--muted); position: relative; font-weight: 500;
-    transition: color .15s; letter-spacing: -0.005em; }
+  /* Bottom navigation tabs */
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    display: flex; gap: 0;
+    background: rgba(15,17,20,0.85);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid var(--border-strong);
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  }
+  .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 8px 4px; border-radius: 10px;
+    color: var(--muted-2); font-size: 11px; font-weight: 500; letter-spacing: -0.005em;
+    position: relative; transition: color .15s, background .15s;
+  }
+  .tab svg { width: 22px; height: 22px; stroke-width: 1.8; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--text-strong); }
-  .tab.active::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
-    background: var(--text-strong); border-radius: 1px;
-  }
+  .tab.active svg { stroke-width: 2.2; }
 
-  /* ===== Active timer card ===== */
+  /* ===== Active timer card — compact horizontal ===== */
   .now {
     position: relative;
     background: linear-gradient(180deg, var(--surface) 0%, #0f1117 100%);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 20px 20px 18px;
-    margin-bottom: 16px;
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
     overflow: hidden;
     transition: border-color .3s ease, box-shadow .3s ease;
   }
   .now::before {
-    content: ''; position: absolute; left: 50%; top: -60%;
-    width: 120%; height: 140%; transform: translateX(-50%);
-    background: radial-gradient(ellipse at center, var(--c, transparent) 0%, transparent 60%);
+    content: ''; position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at left center, var(--c, transparent) 0%, transparent 60%);
     opacity: 0; transition: opacity .4s ease; pointer-events: none;
   }
-  .now-row { position: relative; display: flex; align-items: center; gap: 10px; }
+  .now-row { position: relative; display: flex; align-items: center; gap: 12px; }
   .now-dot {
-    width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none;
+    width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none;
     transition: background .25s, box-shadow .25s;
   }
-  .now-name { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
-  .now-sub { color: var(--muted); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
+  .now-name {
+    font-weight: 600; font-size: 16px; letter-spacing: -0.015em;
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .now-time {
     position: relative;
     font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     font-variant-numeric: tabular-nums;
-    font-weight: 300;
-    font-size: clamp(64px, 18vw, 108px);
-    letter-spacing: -0.06em;
-    text-align: center;
+    font-weight: 400;
+    font-size: 30px;
+    letter-spacing: -0.04em;
     line-height: 1;
-    margin: 18px 0 10px;
     color: var(--text);
+    flex: none;
   }
-  .now-meta {
-    position: relative; display: flex; justify-content: space-between; align-items: center;
-    color: var(--muted); font-size: 11px; padding: 0 4px;
-    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;
-  }
-  .now-meta .v { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; text-transform: none; letter-spacing: 0; }
+  .now-sub, .now-meta { display: none; }
 
   .now.idle { display: none; }
 
@@ -117,103 +129,100 @@
   .now.running {
     border-color: color-mix(in srgb, var(--c) 50%, var(--border) 50%);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 25%, transparent),
-                0 24px 60px -24px color-mix(in srgb, var(--c) 50%, transparent);
+                0 12px 32px -16px color-mix(in srgb, var(--c) 60%, transparent);
   }
-  .now.running::before { opacity: 0.18; }
+  .now.running::before { opacity: 0.22; }
   .now.running .now-dot {
     background: var(--c);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent),
-                0 0 12px color-mix(in srgb, var(--c) 80%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent),
+                0 0 10px color-mix(in srgb, var(--c) 80%, transparent);
     animation: pulse-dot 1.6s ease-in-out infinite;
   }
   .now.running .now-time {
     color: #fff;
-    text-shadow: 0 0 40px color-mix(in srgb, var(--c) 60%, transparent);
+    text-shadow: 0 0 24px color-mix(in srgb, var(--c) 60%, transparent);
   }
-  @keyframes pulse-dot { 0%,100% { transform: scale(1); } 50% { transform: scale(0.65); opacity: 0.85; } }
+  @keyframes pulse-dot { 0%,100% { transform: scale(1); } 50% { transform: scale(0.6); opacity: 0.85; } }
 
+  .now { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .now:active { transform: scale(0.99); }
   .now-stop {
-    margin-top: 16px; width: 100%; padding: 13px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    width: 36px; height: 36px; flex: none;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border-strong);
+    border-radius: 9px;
     color: var(--text);
-    font-weight: 500; font-size: 14px;
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    transition: background .15s, border-color .15s;
+    display: inline-flex; align-items: center; justify-content: center;
+    pointer-events: none;
   }
   .now-stop::before {
-    content: ''; width: 10px; height: 10px; border-radius: 2px; background: currentColor;
+    content: ''; width: 12px; height: 12px; border-radius: 2px; background: currentColor;
   }
-  .now-stop:hover { background: var(--surface-2); border-color: var(--muted); }
 
   /* WARN */
   .now.warn {
     border-color: #ef4444;
-    box-shadow: 0 0 0 1px rgba(239,68,68,0.5), 0 24px 60px -20px rgba(239,68,68,0.55);
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.5), 0 12px 32px -16px rgba(239,68,68,0.55);
     animation: warn-pulse 2s ease-in-out infinite;
   }
   .now.warn::before {
-    background: radial-gradient(ellipse at center, #ef4444 0%, transparent 60%);
-    opacity: 0.22;
+    background: radial-gradient(ellipse at left center, #ef4444 0%, transparent 60%);
+    opacity: 0.28;
   }
   .now.warn .now-dot {
     background: #ef4444;
-    box-shadow: 0 0 0 4px rgba(239,68,68,0.25), 0 0 14px rgba(239,68,68,0.7);
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.25), 0 0 12px rgba(239,68,68,0.7);
   }
-  .now.warn .now-sub { color: #fca5a5; }
   @keyframes warn-pulse {
-    0%,100% { box-shadow: 0 0 0 1px rgba(239,68,68,0.5), 0 24px 60px -20px rgba(239,68,68,0.55); }
-    50%     { box-shadow: 0 0 0 3px rgba(239,68,68,0.3),  0 28px 72px -16px rgba(239,68,68,0.75); }
+    0%,100% { box-shadow: 0 0 0 1px rgba(239,68,68,0.5), 0 12px 32px -16px rgba(239,68,68,0.55); }
+    50%     { box-shadow: 0 0 0 3px rgba(239,68,68,0.3), 0 16px 40px -12px rgba(239,68,68,0.75); }
   }
 
-  /* Categories — Linear-style rows with color accent bar */
-  .grid { display: flex; flex-direction: column; gap: 6px; }
+  /* Categories — 2-col grid, big bold names */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .cat {
     position: relative;
-    width: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 13px 16px 13px 22px;
-    display: flex; align-items: center; gap: 12px;
+    border-radius: 12px;
+    padding: 14px 14px 14px 18px;
+    display: flex; flex-direction: column; justify-content: space-between;
     text-align: left;
     color: var(--text);
     transition: background .15s, border-color .15s, transform .08s;
     overflow: hidden;
-    min-height: 60px;
+    min-height: 76px;
   }
   .cat::before {
     content: ''; position: absolute;
-    left: 8px; top: 14px; bottom: 14px;
+    left: 8px; top: 16px; bottom: 16px;
     width: 3px; border-radius: 2px;
     background: var(--c);
     transition: box-shadow .25s, top .25s, bottom .25s;
   }
   .cat:hover { background: var(--surface-2); border-color: var(--border-strong); }
-  .cat:active { transform: scale(0.997); }
-  .cat-text { flex: 1; min-width: 0; }
+  .cat:active { transform: scale(0.99); }
+  .cat-text { flex: 1; min-width: 0; display: flex; align-items: center; }
   .cat-name {
-    font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: var(--text);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
+    font-size: 17px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-strong);
+    line-height: 1.15;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   }
-  .cat-today { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -0.005em; }
   .cat-time {
-    font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500;
-    color: var(--muted); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 500;
+    color: var(--muted); letter-spacing: -0.01em; margin-top: 6px;
     font-feature-settings: "tnum";
   }
   .cat.active {
-    background: linear-gradient(90deg, color-mix(in srgb, var(--c) 13%, var(--surface)) 0%, var(--surface) 70%);
-    border-color: color-mix(in srgb, var(--c) 35%, var(--border-strong));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--c) 18%, var(--surface)) 0%, var(--surface) 75%);
+    border-color: color-mix(in srgb, var(--c) 45%, var(--border-strong));
   }
   .cat.active::before {
-    top: 8px; bottom: 8px;
+    top: 10px; bottom: 10px;
     box-shadow: 0 0 14px var(--c), 0 0 4px var(--c);
   }
-  .cat.active .cat-name { color: var(--text-strong); }
-  .cat.active .cat-time { color: var(--text-strong); font-weight: 600; font-size: 15px; }
-  .cat.active .cat-today { color: color-mix(in srgb, var(--c) 70%, white 30%); }
+  .cat.active .cat-name { color: #fff; }
+  .cat.active .cat-time { color: color-mix(in srgb, var(--c) 70%, white 30%); font-weight: 600; }
 
   /* Section title */
   .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase;
@@ -402,30 +411,22 @@
     <h1>Tracker</h1>
     <div class="header-actions">
       <button class="icon-btn" title="Настройки" onclick="openSettings()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
   </header>
 
-  <div class="tabs">
-    <button class="tab active" data-tab="track" onclick="switchTab('track')">Трекер</button>
-    <button class="tab" data-tab="stats" onclick="switchTab('stats')">Статистика</button>
-    <button class="tab" data-tab="history" onclick="switchTab('history')">История</button>
-  </div>
-
   <!-- TRACK TAB -->
   <section id="tab-track">
-    <div id="now" class="now idle">
+    <div id="now" class="now idle" role="button" tabindex="0"
+         onclick="stopActive()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();stopActive();}">
       <div class="now-row">
-        <div class="now-dot" id="now-dot" style="background: var(--muted);"></div>
-        <div style="flex:1; min-width:0;">
-          <div class="now-name" id="now-name">Нет активного трекера</div>
-          <div class="now-sub" id="now-sub">Нажми категорию, чтобы запустить</div>
-        </div>
-        <div class="now-time" id="now-time-idle">00:00:00</div>
+        <div class="now-dot" id="now-dot"></div>
+        <div class="now-name" id="now-name"></div>
+        <div class="now-time" id="now-time">00:00:00</div>
+        <div class="now-stop" aria-hidden="true"></div>
       </div>
-      <div class="now-time" id="now-time" style="display:none;">00:00:00</div>
-      <button class="now-stop" id="now-stop" style="display:none;" onclick="stopActive()">Остановить</button>
     </div>
 
     <div class="grid" id="cat-grid"></div>
@@ -438,10 +439,7 @@
       <div class="timeline-track" id="timeline-track"></div>
       <div class="timeline-axis" id="timeline-axis"></div>
       <div class="timeline-legend" id="timeline-legend"></div>
-    </div>
-
-    <div class="stats" style="margin-top: 12px;">
-      <div id="today-stats-list"></div>
+      <div id="today-stats-list" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);"></div>
     </div>
   </section>
 
@@ -462,6 +460,21 @@
   <section id="tab-history" class="hidden">
     <div id="history-list"></div>
   </section>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="track" onclick="switchTab('track')" aria-label="Трекер">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span>Трекер</span>
+    </button>
+    <button class="tab" data-tab="stats" onclick="switchTab('stats')" aria-label="Статистика">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V3"/></svg>
+      <span>Статистика</span>
+    </button>
+    <button class="tab" data-tab="history" onclick="switchTab('history')" aria-label="История">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+      <span>История</span>
+    </button>
+  </nav>
 </div>
 
 <!-- Settings modal -->
@@ -616,9 +629,10 @@ function renderGrid() {
     btn.innerHTML = `
       <div class="cat-text">
         <div class="cat-name">${escapeHtml(c.name)}</div>
-        <div class="cat-today">${isActive ? 'идёт · ' : ''}${todayMs > 0 ? fmtDur(todayMs) + ' сегодня' : 'не запускалась сегодня'}</div>
       </div>
-      <div class="cat-time" ${isActive ? `id="cat-running-${c.id}"` : ''}>${isActive ? '00:00:00' : (todayMs > 0 ? fmtDur(todayMs) : '')}</div>
+      ${isActive
+        ? `<div class="cat-time" id="cat-running-${c.id}">00:00:00</div>`
+        : (todayMs > 0 ? `<div class="cat-time">${fmtDur(todayMs)}</div>` : '')}
     `;
     grid.appendChild(btn);
   });
@@ -709,7 +723,7 @@ function renderTimeline() {
     .forEach(c => {
       const item = document.createElement('div');
       item.className = 'timeline-legend-item';
-      item.innerHTML = `<div class="d" style="background:${c.color}"></div><span>${escapeHtml(c.name)}</span> <span class="v">${fmtDur(totals[c.id])}</span>`;
+      item.innerHTML = `<div class="d" style="background:${c.color}"></div><span>${escapeHtml(c.name)}</span>`;
       legend.appendChild(item);
     });
   if (dayTotal === 0) {
@@ -748,32 +762,17 @@ function renderTodayStats(totals, dayTotal) {
 
 function renderNow() {
   const nowEl = document.getElementById('now');
-  const bigTime = document.getElementById('now-time');
-  const idleTime = document.getElementById('now-time-idle');
-  const stopBtn = document.getElementById('now-stop');
   if (state.active) {
     const c = catById(state.active.catId);
     if (!c) { state.active = null; renderNow(); return; }
     nowEl.classList.remove('idle');
     nowEl.classList.add('running');
     nowEl.style.setProperty('--c', c.color);
-    document.getElementById('now-dot').style.background = c.color;
     document.getElementById('now-name').textContent = c.name;
-    document.getElementById('now-sub').textContent = 'идёт';
-    bigTime.style.display = '';
-    idleTime.style.display = 'none';
-    stopBtn.style.display = '';
     tick();
   } else {
     nowEl.classList.add('idle');
     nowEl.classList.remove('running', 'warn');
-    document.getElementById('now-dot').style.background = 'var(--muted)';
-    document.getElementById('now-name').textContent = 'Нет активного трекера';
-    document.getElementById('now-sub').textContent = 'Нажми категорию, чтобы запустить';
-    bigTime.style.display = 'none';
-    idleTime.style.display = '';
-    idleTime.textContent = '00:00:00';
-    stopBtn.style.display = 'none';
   }
 }
 
@@ -793,18 +792,7 @@ function tick() {
   // Warning state after threshold
   const limitMs = (state.warnMinutes || 25) * 60 * 1000;
   const nowEl = document.getElementById('now');
-  const sub = document.getElementById('now-sub');
-  if (ms >= limitMs) {
-    if (!nowEl.classList.contains('warn')) {
-      nowEl.classList.add('warn');
-      sub.textContent = `больше ${state.warnMinutes || 25} мин — пора переключаться`;
-    }
-  } else {
-    if (nowEl.classList.contains('warn')) {
-      nowEl.classList.remove('warn');
-      sub.textContent = 'идёт';
-    }
-  }
+  nowEl.classList.toggle('warn', ms >= limitMs);
 
   // Live timeline tick
   if (currentTab === 'track' && Math.floor(ms / 1000) % 5 === 0) renderTimeline();
