@@ -1091,16 +1091,49 @@ function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
 /* ---------- Auth ---------- */
 async function bootAuth() {
   try {
-    const { data: { session: s } } = await sb.auth.getSession();
+    const { data: { session: s0 } } = await sb.auth.getSession();
+    let s = s0;
+    // Принудительный refresh, если есть сессия — гарантируем свежий токен
+    if (s0 && s0.refresh_token) {
+      try {
+        const r = await sb.auth.refreshSession();
+        if (!r.error && r.data.session) s = r.data.session;
+      } catch (e) { console.warn('refreshSession failed, using existing:', e); }
+    }
     await applySession(s);
     sb.auth.onAuthStateChange(async (_event, ses) => { await applySession(ses); });
   } catch (e) {
     console.error('bootAuth failed:', e);
-    document.getElementById('gate').classList.remove('hidden');
-    document.getElementById('app').classList.add('hidden');
+    document.documentElement.classList.remove('authed');
     const status = document.getElementById('gate-status');
     if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка инициализации: ' + e.message; }
   }
+}
+
+const CACHE_KEY = 'tracker.cache.v1';
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+    const c = JSON.parse(raw);
+    state.categories = c.categories || [];
+    state.entries = c.entries || [];
+    state.active = c.active || null;
+    state.warnMinutes = c.warnMinutes || 25;
+    return state.categories.length > 0;
+  } catch { return false; }
+}
+
+function saveCache() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      categories: state.categories,
+      entries: state.entries.slice(0, 500),
+      active: state.active,
+      warnMinutes: state.warnMinutes,
+    }));
+  } catch {}
 }
 
 async function applySession(s) {
@@ -1109,21 +1142,30 @@ async function applySession(s) {
   if (s) {
     try {
       document.getElementById('user-email').textContent = s.user.email;
-      // Сразу показываем app, чтобы не зависать на "Загрузка..."
       html.classList.add('authed');
+      // 1. Мгновенный рендер из кэша если есть
+      if (loadCache()) renderGrid();
+      // 2. Фоновое обновление с сервера
       await loadAll();
+      saveCache();
       setupRealtime();
       renderGrid();
     } catch (e) {
       console.error('applySession failed:', e);
-      html.classList.remove('authed');
-      const status = document.getElementById('gate-status');
-      if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка загрузки: ' + (e.message || e); }
+      // Если есть кэш — оставляем его и ругаемся в углу, а не выгоняем на гейт
+      if (state.categories.length === 0) {
+        html.classList.remove('authed');
+        const status = document.getElementById('gate-status');
+        if (status) { status.style.color = 'var(--danger)'; status.textContent = 'Ошибка загрузки: ' + (e.message || e); }
+      } else {
+        console.warn('Showing stale cache due to load error');
+      }
     }
   } else {
     html.classList.remove('authed');
     if (realtime) { sb.removeChannel(realtime); realtime = null; }
     state = { categories: [], entries: [], active: null, warnMinutes: 25 };
+    try { localStorage.removeItem(CACHE_KEY); } catch {}
   }
 }
 
@@ -1214,6 +1256,7 @@ function syncSoon() {
   syncTimer = setTimeout(async () => {
     if (pendingMutations > 0) { syncSoon(); return; }
     await loadAll();
+    saveCache();
     if (currentTab === 'track')   renderGrid();
     if (currentTab === 'stats')   renderStats();
     if (currentTab === 'history') renderHistory();
