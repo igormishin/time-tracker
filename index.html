@@ -1439,13 +1439,24 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function setupRealtime() {
-  if (realtime) sb.removeChannel(realtime);
+  if (realtime) { try { sb.removeChannel(realtime); } catch {} }
   realtime = sb.channel('user-data')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => syncSoon())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' },    () => syncSoon())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' },   () => syncSoon())
-    .subscribe();
+    .subscribe((status) => {
+      // Если канал умер — пробуем поднять через 3с
+      if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+        console.warn('realtime status:', status, '→ reconnect in 3s');
+        setTimeout(() => { if (session) setupRealtime(); }, 3000);
+      }
+    });
 }
+
+// Периодический пересинк раз в 2 минуты — страховка если realtime молча отвалился
+setInterval(() => {
+  if (session && !document.hidden && navigator.onLine) syncSoon();
+}, 120_000);
 function syncSoon() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
