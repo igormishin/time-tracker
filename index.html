@@ -1118,17 +1118,29 @@ const withTimeoutP = (p, ms, label) => Promise.race([
   p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout: ' + label)), ms))
 ]);
 
-async function bootAuth() {
-  try {
-    // Если есть кэш — показываем дашборд мгновенно, ещё ДО проверки сессии
-    if (document.documentElement.classList.contains('authed') && loadCache()) {
-      renderGrid();
+async function getSessionWithRetry(retries = 2) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await withTimeoutP(sb.auth.getSession(), 15000, 'getSession');
+    } catch (e) {
+      lastErr = e;
+      console.warn(`getSession attempt ${i+1} failed:`, e.message);
+      if (i < retries) await new Promise(r => setTimeout(r, 800));
     }
-    const { data: { session: s0 } } = await withTimeoutP(sb.auth.getSession(), 8000, 'getSession');
+  }
+  throw lastErr;
+}
+
+async function bootAuth() {
+  const hasCache = document.documentElement.classList.contains('authed') && loadCache();
+  if (hasCache) renderGrid();
+  try {
+    const { data: { session: s0 } } = await getSessionWithRetry(2);
     let s = s0;
     if (s0 && s0.refresh_token) {
       try {
-        const r = await withTimeoutP(sb.auth.refreshSession(), 8000, 'refreshSession');
+        const r = await withTimeoutP(sb.auth.refreshSession(), 15000, 'refreshSession');
         if (!r.error && r.data.session) s = r.data.session;
       } catch (e) { console.warn('refreshSession failed, using existing:', e); }
     }
@@ -1136,9 +1148,13 @@ async function bootAuth() {
     sb.auth.onAuthStateChange(async (_event, ses) => { await applySession(ses); });
   } catch (e) {
     console.error('bootAuth failed:', e);
-    // Оставляем кэш (если был), показываем диагностику
-    const diag = document.getElementById('diag-banner');
-    if (diag) { diag.style.display = 'block'; diag.textContent = 'Ошибка авторизации: ' + e.message; }
+    // Если есть кэш — тихо логируем, юзера не пугаем
+    if (!hasCache) {
+      const diag = document.getElementById('diag-banner');
+      if (diag) { diag.style.display = 'block'; diag.textContent = 'Ошибка авторизации: ' + e.message; }
+    }
+    // Через 5с попробуем ещё раз поднять сессию
+    setTimeout(() => bootAuth(), 5000);
   }
 }
 
