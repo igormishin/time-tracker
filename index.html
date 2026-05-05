@@ -1173,15 +1173,18 @@ async function logout() {
 
 /* ---------- Data load ---------- */
 async function loadAll() {
-  if (!session) return;
-  const [cats, ents, settings] = await Promise.all([
-    sb.from('categories').select('*').order('position'),
-    sb.from('entries').select('*').order('start_at', { ascending: false }).limit(5000),
-    sb.from('settings').select('*').maybeSingle()
+  if (!session) throw new Error('Нет активной сессии');
+  const withTimeout = (p, ms = 15000, label = 'query') => Promise.race([
+    p, new Promise((_, rej) => setTimeout(() => rej(new Error('Таймаут: ' + label)), ms))
   ]);
-  if (cats.error)     console.error('categories:', cats.error);
-  if (ents.error)     console.error('entries:', ents.error);
-  if (settings.error) console.error('settings:', settings.error);
+  const [cats, ents, settings] = await Promise.all([
+    withTimeout(sb.from('categories').select('*').order('position'), 15000, 'categories'),
+    withTimeout(sb.from('entries').select('*').order('start_at', { ascending: false }).limit(5000), 15000, 'entries'),
+    withTimeout(sb.from('settings').select('*').maybeSingle(), 15000, 'settings')
+  ]);
+  if (cats.error)     throw new Error('categories: ' + cats.error.message);
+  if (ents.error)     throw new Error('entries: ' + ents.error.message);
+  if (settings.error) throw new Error('settings: ' + settings.error.message);
 
   state.categories = (cats.data || []).map(c => ({
     id: c.id, name: c.name, color: c.color, position: c.position
