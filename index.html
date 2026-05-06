@@ -1469,7 +1469,9 @@ function updateQueueBadge() {
   }
 }
 
+let lastMutationAt = 0;
 function mutate(op) {
+  lastMutationAt = Date.now();
   queue.push(op);
   saveQueue();
   processQueue();
@@ -1528,7 +1530,8 @@ function setOnlineState() {
 }
 window.addEventListener('online', setOnlineState);
 window.addEventListener('offline', setOnlineState);
-setInterval(() => { if (queue.length > 0 && navigator.onLine) processQueue(); }, 30000);
+// Агрессивный ретрай — каждые 5с пока есть pending
+setInterval(() => { if (queue.length > 0 && navigator.onLine) processQueue(); }, 5000);
 
 // При возврате PWA/вкладки на экран — пересинкаемся (realtime мог отвалиться в фоне)
 document.addEventListener('visibilitychange', () => {
@@ -1566,6 +1569,12 @@ function syncSoon() {
   syncTimer = setTimeout(async () => {
     if (queue.length > 0) { syncSoon(); return; }
     if (!navigator.onLine) { syncSoon(); return; }
+    // Защита от перезаписи оптимистичного state свежей мутацией
+    const sinceMutation = Date.now() - lastMutationAt;
+    if (sinceMutation < 5000) {
+      setTimeout(syncSoon, 5000 - sinceMutation);
+      return;
+    }
     try { await loadAll(); saveCache(); } catch(e) { console.warn('syncSoon loadAll failed:', e); return; }
     if (currentTab === 'track')   renderGrid();
     if (currentTab === 'stats')   renderStats();
