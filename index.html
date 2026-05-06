@@ -1021,7 +1021,9 @@ function deleteEntry() {
   closeEdit();
   renderHistory(); renderGrid();
   if (currentTab === 'stats') renderStats();
-  mutate({ op: 'delete', table: 'entries', where: { id } });
+  // Soft delete вместо физического — всегда восстановимо через SQL
+  mutate({ op: 'update', table: 'entries',
+    payload: { deleted_at: new Date().toISOString() }, where: { id } });
 }
 function toLocalInput(d) {
   const pad = n => String(n).padStart(2,'0');
@@ -1112,7 +1114,9 @@ function removeCategory(i) {
   if (isActive) state.active = null;
   saveCache();
   renderSettingsCats();
-  mutate({ op: 'delete', table: 'categories', where: { id: c.id } });
+  // Soft delete категории + soft delete её записей (две мутации)
+  mutate({ op: 'update', table: 'categories',
+    payload: { deleted_at: new Date().toISOString() }, where: { id: c.id } });
 }
 
 /* ---------- Data import/export ---------- */
@@ -1313,8 +1317,11 @@ async function loadAll() {
   const withTimeout = (p, ms = 30000, label = 'query') => Promise.race([
     p, new Promise((_, rej) => setTimeout(() => rej(new Error('Таймаут: ' + label)), ms))
   ]);
-  // Категории — критично, грузим первыми
-  const cats = await withTimeout(sb.from('categories').select('*').order('position'), 30000, 'categories');
+  // Категории — критично, грузим первыми. Учитываем soft delete.
+  const cats = await withTimeout(
+    sb.from('categories').select('*').is('deleted_at', null).order('position'),
+    30000, 'categories'
+  );
   if (cats.error) throw new Error('categories: ' + cats.error.message);
   state.categories = (cats.data || []).map(c => ({
     id: c.id, name: c.name, color: c.color, position: c.position
@@ -1324,7 +1331,11 @@ async function loadAll() {
 
   // Settings и entries — параллельно
   const [ents, settings] = await Promise.all([
-    withTimeout(sb.from('entries').select('*').order('start_at', { ascending: false }).limit(2000), 30000, 'entries'),
+    withTimeout(
+      sb.from('entries').select('*').is('deleted_at', null)
+        .order('start_at', { ascending: false }).limit(2000),
+      30000, 'entries'
+    ),
     withTimeout(sb.from('settings').select('*').maybeSingle(), 15000, 'settings')
   ]);
   if (ents.error)     throw new Error('entries: ' + ents.error.message);
