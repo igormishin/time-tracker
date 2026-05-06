@@ -1573,6 +1573,14 @@ function syncSoon() {
   }, 300);
 }
 
+// Экспортируем state и helpers на window для отладки/тестов
+window.state = state;
+window.getCurrentTab = () => currentTab;
+window.forceStopActive = forceStopActive;
+window.toggleCategory = toggleCategory;
+window.openEdit = openEdit;
+window.deleteEntry = deleteEntry;
+
 /* ---------- Boot ---------- */
 // Если есть кэш — показываем дашборд мгновенно, не дожидаясь сети
 if (document.documentElement.classList.contains('authed')) {
