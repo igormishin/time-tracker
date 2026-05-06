@@ -1449,16 +1449,20 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+let realtimeWasOpen = false;
 function setupRealtime() {
   if (realtime) { try { sb.removeChannel(realtime); } catch {} }
+  realtimeWasOpen = false;
   realtime = sb.channel('user-data')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => syncSoon())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' },    () => syncSoon())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' },   () => syncSoon())
     .subscribe((status) => {
-      // Если канал умер — пробуем поднять через 3с
-      if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
-        console.warn('realtime status:', status, '→ reconnect in 3s');
+      if (status === 'SUBSCRIBED') { realtimeWasOpen = true; return; }
+      // Реконнектимся только если канал был открыт и упал — игнорим стартовые CLOSED/CONNECTING
+      if (realtimeWasOpen && (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT')) {
+        console.warn('realtime dropped:', status, '→ reconnect in 3s');
+        realtimeWasOpen = false;
         setTimeout(() => { if (session) setupRealtime(); }, 3000);
       }
     });
