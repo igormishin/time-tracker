@@ -490,27 +490,8 @@
     <div id="history-list"></div>
   </section>
 
-  <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="track" onclick="switchTab('track')" aria-label="Трекер">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-    </button>
-    <button class="tab" data-tab="stats" onclick="switchTab('stats')" aria-label="Статистика">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V3"/></svg>
-    </button>
-    <button class="tab" data-tab="history" onclick="switchTab('history')" aria-label="История">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
-    </button>
-    <button class="tab" onclick="openSettings()" aria-label="Настройки">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
-  </nav>
-</div>
-
-<!-- Settings modal -->
-<div id="settings-modal" class="modal-bg hidden" onclick="if(event.target===this) closeSettings()">
-  <div class="modal">
-    <h3 class="modal-title">Настройки <button onclick="closeSettings()">Закрыть</button></h3>
-
+  <!-- SETTINGS TAB -->
+  <section id="tab-settings" class="hidden">
     <div class="section-title" style="margin-top:0">Категории</div>
     <div class="cat-list" id="settings-cats"></div>
     <button class="add-cat" onclick="addCategory()">+ Добавить категорию</button>
@@ -530,8 +511,23 @@
 
     <div class="section-title">Данные</div>
     <button class="btn secondary" onclick="exportData()">Экспорт JSON</button>
-    <button class="btn secondary" onclick="forceStopActive(); closeSettings();" style="margin-top: 8px;">Сбросить активный таймер</button>
-  </div>
+    <button class="btn secondary" onclick="forceStopActive()" style="margin-top: 8px;">Сбросить активный таймер</button>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="track" onclick="switchTab('track')" aria-label="Трекер">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    </button>
+    <button class="tab" data-tab="stats" onclick="switchTab('stats')" aria-label="Статистика">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V3"/></svg>
+    </button>
+    <button class="tab" data-tab="history" onclick="switchTab('history')" aria-label="История">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+    </button>
+    <button class="tab" data-tab="settings" onclick="switchTab('settings')" aria-label="Настройки">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </nav>
 </div>
 
 <!-- Edit entry modal -->
@@ -1014,8 +1010,22 @@ function renderHistory() {
           <div class="t">${fmtTime(start)} – ${e._active ? 'сейчас' : fmtTime(end)}</div>
         </div>
         <div class="dur">${fmtDur(dur)}</div>
-        ${e._active ? '' : `<button class="menu" onclick="openEdit('${e.id}')" title="Редактировать">✎</button>`}
       `;
+      if (!e._active) {
+        row.style.cursor = 'pointer';
+        row.onclick = () => openEdit(e.id);
+        const del = document.createElement('button');
+        del.className = 'menu';
+        del.innerHTML = '✕';
+        del.title = 'Удалить';
+        del.onclick = (ev) => {
+          ev.stopPropagation();
+          if (!confirm('Удалить запись «' + c.name + '» от ' + fmtTime(start) + '?')) return;
+          editingEntryId = e.id;
+          deleteEntry();
+        };
+        row.appendChild(del);
+      }
       list.appendChild(row);
     });
   });
@@ -1051,27 +1061,40 @@ function openEdit(id) {
   document.getElementById('edit-modal').classList.remove('hidden');
 }
 function closeEdit() {
+  // Автосохранение если значения валидны и изменились
+  if (editingEntryId) {
+    const e = state.entries.find(x => x.id === editingEntryId);
+    if (e) {
+      const s = new Date(document.getElementById('edit-start').value);
+      const en = new Date(document.getElementById('edit-end').value);
+      const cat = document.getElementById('edit-cat').value;
+      if (!isNaN(s) && !isNaN(en) && en > s && cat) {
+        const start = s.toISOString();
+        const end = en.toISOString();
+        if (cat !== e.catId || start !== e.start || end !== e.end) {
+          e.catId = cat; e.start = start; e.end = end;
+          saveCache();
+          mutate({ op: 'update', table: 'entries',
+            payload: { category_id: cat, start_at: start, end_at: end },
+            where: { id: e.id }
+          });
+          renderHistory(); renderGrid();
+          if (currentTab === 'stats') renderStats();
+        }
+      }
+    }
+  }
   document.getElementById('edit-modal').classList.add('hidden');
   editingEntryId = null;
 }
 function saveEdit() {
+  // Кнопка "Сохранить" — то же самое что закрытие, но с явным фидбеком при ошибке
   const e = state.entries.find(x => x.id === editingEntryId);
-  if (!e) return;
+  if (!e) { closeEdit(); return; }
   const s = new Date(document.getElementById('edit-start').value);
   const en = new Date(document.getElementById('edit-end').value);
   if (isNaN(s) || isNaN(en) || en <= s) { alert('Неверные даты'); return; }
-  const newCat = document.getElementById('edit-cat').value;
-  const start = s.toISOString();
-  const end = en.toISOString();
-  e.catId = newCat; e.start = start; e.end = end;
-  saveCache();
   closeEdit();
-  renderHistory(); renderGrid();
-  if (currentTab === 'stats') renderStats();
-  mutate({ op: 'update', table: 'entries',
-    payload: { category_id: newCat, start_at: start, end_at: end },
-    where: { id: e.id }
-  });
 }
 function deleteEntry() {
   if (!confirm('Удалить запись?')) return;
@@ -1095,7 +1118,6 @@ function openSettings() {
   renderSettingsCats();
   document.getElementById('set-warn-minutes').value = state.warnMinutes || 25;
   if (session) document.getElementById('user-email').textContent = session.user.email;
-  document.getElementById('settings-modal').classList.remove('hidden');
 }
 function saveWarnMinutes() {
   const v = parseInt(document.getElementById('set-warn-minutes').value, 10);
@@ -1109,7 +1131,6 @@ function saveWarnMinutes() {
   alert('Сохранено: ' + v + ' мин');
 }
 function closeSettings() {
-  document.getElementById('settings-modal').classList.add('hidden');
   saveAllCategories();
   renderGrid();
   if (currentTab === 'stats') renderStats();
@@ -1191,14 +1212,20 @@ function exportData() {
 }
 /* ---------- Tabs ---------- */
 function switchTab(t) {
+  // Если уходим из настроек — сохраняем категории
+  if (currentTab === 'settings' && t !== 'settings') saveAllCategories();
   currentTab = t;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   document.getElementById('tab-track').classList.toggle('hidden', t !== 'track');
   document.getElementById('tab-stats').classList.toggle('hidden', t !== 'stats');
   document.getElementById('tab-history').classList.toggle('hidden', t !== 'history');
+  document.getElementById('tab-settings').classList.toggle('hidden', t !== 'settings');
   if (t === 'stats') renderStats();
   if (t === 'history') renderHistory();
   if (t === 'track') renderGrid();
+  if (t === 'settings') openSettings();
+  // Скрываем bottom-nav scrolling artifacts
+  window.scrollTo(0, 0);
 }
 
 /* ---------- Utils ---------- */
@@ -1286,6 +1313,8 @@ async function applySession(s) {
       // 1. Мгновенный рендер из кэша если есть
       if (loadCache()) renderGrid();
       updateQueueBadge();
+      // Realtime поднимаем сразу — даже если loadAll потом упадёт
+      setupRealtime();
       // Если есть pending — гоняем их в фоне, не блокируя загрузку
       if (queue.length > 0) processQueue();
       // 2. Фоновое обновление с сервера
