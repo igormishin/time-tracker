@@ -449,6 +449,7 @@
   <section id="tab-track">
     <div class="offline-pill" id="offline-pill">Офлайн — изменения сохранятся локально и синхронизируются позже</div>
     <div id="diag-banner" style="display:none; margin:0 0 10px; padding:10px 12px; background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.35); color:#fca5a5; border-radius:10px; font-size:12.5px; line-height:1.4;"></div>
+    <div id="stale-banner" style="display:none; margin:0 0 10px; padding:12px 14px; background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.4); color:#fcd34d; border-radius:10px; font-size:13px; line-height:1.45;"></div>
     <div class="timeline-card">
       <div class="timeline-track" id="timeline-track"></div>
       <div class="timeline-axis" id="timeline-axis"></div>
@@ -776,6 +777,46 @@ function renderNow() {
     nowEl.classList.add('idle');
     nowEl.classList.remove('running', 'warn');
   }
+  updateStaleBanner();
+}
+
+function updateStaleBanner() {
+  const banner = document.getElementById('stale-banner');
+  if (!banner) return;
+  if (!state.active) { banner.style.display = 'none'; return; }
+  const start = new Date(state.active.start);
+  const ageMs = Date.now() - start.getTime();
+  const SIX_HOURS = 6 * 3600 * 1000;
+  if (ageMs < SIX_HOURS) { banner.style.display = 'none'; return; }
+  const c = catById(state.active.catId);
+  if (!c) { banner.style.display = 'none'; return; }
+  const hours = Math.floor(ageMs / 3600000);
+  const dateLabel = start.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  banner.style.display = 'block';
+  banner.innerHTML = `
+    ⚠ Таймер «${escapeHtml(c.name)}» идёт <b>${hours} ч</b> — с ${dateLabel}.<br>
+    <button onclick="closeActiveAtStartDayEnd()" style="margin-top:8px; padding:8px 12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:#fcd34d; border-radius:8px; font-size:12.5px; cursor:pointer;">
+      Закрыть таймер на 23:59 ${start.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+    </button>
+    <button onclick="document.getElementById('stale-banner').style.display='none'" style="margin-top:8px; margin-left:8px; padding:8px 12px; background:transparent; border:1px solid rgba(255,255,255,0.18); color:#fcd34d; border-radius:8px; font-size:12.5px; cursor:pointer;">
+      Скрыть
+    </button>
+  `;
+}
+
+function closeActiveAtStartDayEnd() {
+  if (!state.active) return;
+  const start = new Date(state.active.start);
+  // Конец дня старта = следующий день 00:00 минус 1 мс
+  const endOfStartDay = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 0, 0, 0, -1);
+  const t = endOfStartDay.toISOString();
+  const closing = state.active;
+  state.entries.unshift({ id: closing.id, catId: closing.catId, start: closing.start, end: t });
+  state.active = null;
+  saveCache();
+  renderGrid();
+  if (currentTab === 'history') renderHistory();
+  mutate({ op: 'update', table: 'entries', payload: { end_at: t }, where: { id: closing.id } });
 }
 
 function stopActive() {
@@ -917,22 +958,40 @@ function renderHistory() {
     list.innerHTML = '<div class="stats-empty">Пока пусто</div>';
     return;
   }
-  // Группируем по дню (по дате старта)
+  // Группируем по дню. Записи пересекающие полночь — делим на per-day слайсы.
   const byDay = {};
   const all = [...state.entries];
   if (state.active) all.push({ id: '__active', catId: state.active.catId, start: state.active.start, end: null, _active: true });
-  all.sort((a,b) => new Date(b.start) - new Date(a.start));
   all.forEach(e => {
-    const dKey = startOfDay(new Date(e.start)).toISOString();
-    (byDay[dKey] = byDay[dKey] || []).push(e);
+    const start = new Date(e.start);
+    const end = e.end ? new Date(e.end) : new Date();
+    let dStart = startOfDay(start);
+    while (dStart < end) {
+      const dEnd = new Date(dStart.getTime() + 86400000);
+      const sliceStart = start > dStart ? start : dStart;
+      const sliceEnd = end < dEnd ? end : dEnd;
+      const dKey = dStart.toISOString();
+      (byDay[dKey] = byDay[dKey] || []).push({
+        ...e,
+        _sliceStart: sliceStart.toISOString(),
+        _sliceEnd: sliceEnd.toISOString(),
+        _isSlice: start < dStart || end > dEnd,
+      });
+      dStart = dEnd;
+    }
   });
+  // Сортируем дни по убыванию + внутри дня по убыванию начала слайса
+  Object.values(byDay).forEach(arr => arr.sort((a, b) =>
+    new Date(b._sliceStart || b.start) - new Date(a._sliceStart || a.start)
+  ));
 
-  Object.keys(byDay).forEach(dKey => {
+  Object.keys(byDay).sort().reverse().forEach(dKey => {
     const date = new Date(dKey);
     const entries = byDay[dKey];
     const dayTotal = entries.reduce((sum, e) => {
-      const end = e.end ? new Date(e.end) : new Date();
-      return sum + (end - new Date(e.start));
+      const start = new Date(e._sliceStart || e.start);
+      const end = e._sliceEnd ? new Date(e._sliceEnd) : (e.end ? new Date(e.end) : new Date());
+      return sum + (end - start);
     }, 0);
     const header = document.createElement('div');
     header.className = 'day-header';
@@ -942,15 +1001,16 @@ function renderHistory() {
     entries.forEach(e => {
       const c = catById(e.catId);
       if (!c) return;
-      const start = new Date(e.start);
-      const end = e.end ? new Date(e.end) : new Date();
+      const start = new Date(e._sliceStart || e.start);
+      const end = (e._sliceEnd ? new Date(e._sliceEnd) : (e.end ? new Date(e.end) : new Date()));
       const dur = end - start;
+      const sliceMark = e._isSlice ? ' (продолжение)' : '';
       const row = document.createElement('div');
       row.className = 'entry';
       row.innerHTML = `
         <div class="dot" style="background:${c.color}"></div>
         <div class="info">
-          <div class="n">${escapeHtml(c.name)}${e._active ? ' · идёт' : ''}</div>
+          <div class="n">${escapeHtml(c.name)}${e._active ? ' · идёт' : ''}${sliceMark}</div>
           <div class="t">${fmtTime(start)} – ${e._active ? 'сейчас' : fmtTime(end)}</div>
         </div>
         <div class="dur">${fmtDur(dur)}</div>
