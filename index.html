@@ -226,6 +226,17 @@
   }
   .range-switch button:hover { color: var(--text); }
   .range-switch button.active { background: var(--bg); color: var(--text-strong); box-shadow: 0 1px 0 rgba(255,255,255,0.04); }
+  .range-dates { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .range-dates input[type="date"] {
+    flex: 1; padding: 9px 11px; font-size: 13px;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 8px; color: var(--text);
+    color-scheme: dark;
+  }
+  .range-dash { color: var(--muted); font-size: 13px; }
+  .stats-total-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
+  .stats-total-row .stats-total { margin: 0; }
+  .stats-range-label { color: var(--muted); font-size: 12px; letter-spacing: -0.01em; text-align: right; }
   .stats-total {
     font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 16px;
     font-variant-numeric: tabular-nums; color: var(--text-strong);
@@ -476,11 +487,20 @@
   <section id="tab-stats" class="hidden">
     <div class="range-switch">
       <button class="active" data-range="day" onclick="setRange('day')">Сегодня</button>
-      <button data-range="week" onclick="setRange('week')">Неделя</button>
-      <button data-range="month" onclick="setRange('month')">Месяц</button>
+      <button data-range="yesterday" onclick="setRange('yesterday')">Вчера</button>
+      <button data-range="week" onclick="setRange('week')">7 дней</button>
+      <button data-range="month" onclick="setRange('month')">30 дней</button>
+    </div>
+    <div class="range-dates">
+      <input type="date" id="range-from" oninput="onCustomRange()" />
+      <span class="range-dash">—</span>
+      <input type="date" id="range-to" oninput="onCustomRange()" />
     </div>
     <div class="stats">
-      <div class="stats-total" id="stats-total">0ч 0м</div>
+      <div class="stats-total-row">
+        <div class="stats-total" id="stats-total">—</div>
+        <div class="stats-range-label" id="stats-range-label"></div>
+      </div>
       <div id="stats-list"></div>
     </div>
   </section>
@@ -904,21 +924,72 @@ function setRange(r) {
   document.querySelectorAll('.range-switch button').forEach(b => {
     b.classList.toggle('active', b.dataset.range === r);
   });
+  // Синхронизируем date inputs с выбранным пресетом
+  if (r !== 'custom') {
+    const { from, to } = rangeBounds();
+    const fromInp = document.getElementById('range-from');
+    const toInp = document.getElementById('range-to');
+    if (fromInp) fromInp.value = toDateInputValue(from);
+    if (toInp)   toInp.value   = toDateInputValue(to);
+  }
   renderStats();
 }
+
+function onCustomRange() {
+  currentRange = 'custom';
+  document.querySelectorAll('.range-switch button').forEach(b => b.classList.remove('active'));
+  renderStats();
+}
+
+function toDateInputValue(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
 function rangeBounds() {
-  const to = new Date();
-  let from;
-  if (currentRange === 'day') from = startOfDay(to);
-  else if (currentRange === 'week') from = startOfWeek(to);
-  else from = startOfMonth(to);
-  return { from, to };
+  const now = new Date();
+  if (currentRange === 'day') {
+    return { from: startOfDay(now), to: now };
+  }
+  if (currentRange === 'yesterday') {
+    const yStart = startOfDay(new Date(now.getTime() - 86400000));
+    const yEnd   = startOfDay(now); // exclusive
+    return { from: yStart, to: yEnd };
+  }
+  if (currentRange === 'week') {
+    return { from: startOfDay(new Date(now.getTime() - 7 * 86400000)), to: now };
+  }
+  if (currentRange === 'month') {
+    return { from: startOfDay(new Date(now.getTime() - 30 * 86400000)), to: now };
+  }
+  if (currentRange === 'custom') {
+    const fromV = document.getElementById('range-from')?.value;
+    const toV   = document.getElementById('range-to')?.value;
+    if (fromV && toV) {
+      const from = new Date(fromV); from.setHours(0,0,0,0);
+      const to   = new Date(toV);   to.setHours(23,59,59,999);
+      return { from, to };
+    }
+  }
+  return { from: startOfDay(now), to: now };
+}
+
+function rangeLabel() {
+  const { from, to } = rangeBounds();
+  const fmt = d => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  if (currentRange === 'day')       return 'сегодня';
+  if (currentRange === 'yesterday') return 'вчера';
+  if (currentRange === 'week')      return `${fmt(from)} — сегодня`;
+  if (currentRange === 'month')     return `${fmt(from)} — сегодня`;
+  return `${fmt(from)} — ${fmt(new Date(to.getTime() - 1))}`;
 }
 function renderStats() {
   const { from, to } = rangeBounds();
   const totals = aggregate(from, to);
   const totalMs = Object.values(totals).reduce((a,b) => a+b, 0);
   document.getElementById('stats-total').textContent = totalMs > 0 ? fmtDur(totalMs) : '—';
+  const label = document.getElementById('stats-range-label');
+  if (label) label.textContent = rangeLabel();
 
   const list = document.getElementById('stats-list');
   list.innerHTML = '';
@@ -1220,7 +1291,7 @@ function switchTab(t) {
   document.getElementById('tab-stats').classList.toggle('hidden', t !== 'stats');
   document.getElementById('tab-history').classList.toggle('hidden', t !== 'history');
   document.getElementById('tab-settings').classList.toggle('hidden', t !== 'settings');
-  if (t === 'stats') renderStats();
+  if (t === 'stats') setRange(currentRange);
   if (t === 'history') renderHistory();
   if (t === 'track') renderGrid();
   if (t === 'settings') openSettings();
