@@ -743,47 +743,65 @@ function buildDaylightGradient(date) {
   const { sunrise, sunset } = getSunriseSunset(date);
   const VS = TIMELINE_START_HOUR, VE = 24;
   const span = VE - VS;
-  const pct = h => ((h - VS) / span) * 100;
   const clamp = p => Math.max(0, Math.min(100, p));
-  const COLOR = {
-    night:        '#0d1124',
-    twilightDawn: '#3a2455',
-    dawnPeak:     '#ff7b3a',
-    morning:      '#ffce6b',
-    midday:       '#ffe9b3',
-    afternoon:    '#ffce6b',
-    sunsetPeak:   '#ff5722',
-    twilightDusk: '#3a2455',
-  };
+  const pct = h => clamp(((h - VS) / span) * 100);
+
+  // Плавная палитра с длинными переходами через сумерки (как в Apple Weather).
+  // Каждая фаза = час до/после восхода/заката + плавная привязка к полудню.
+  const phases = [
+    // ===== Утренние сумерки и восход (растянуто на ~2.5 часа) =====
+    [sunrise - 2.0,  '#08102a'], // глубокая ночь
+    [sunrise - 1.5,  '#13183a'], // астрономические сумерки
+    [sunrise - 1.0,  '#262050'], // навигационные
+    [sunrise - 0.7,  '#3e2868'], // ранние гражданские (индиго→фиолет)
+    [sunrise - 0.45, '#6b3478'], // фиолетово-розовые
+    [sunrise - 0.25, '#a04a78'], // розовый
+    [sunrise - 0.1,  '#d8635a'], // коралловый
+    [sunrise,        '#ff8e54'], // восход — золотой час
+    [sunrise + 0.3,  '#ffaa6c'], // тёплый янтарь
+    [sunrise + 0.8,  '#ffc88a'], // утренний амбер
+    [sunrise + 1.5,  '#ffdcaa'], // мягкий крем
+    [sunrise + 2.5,  '#fee9c2'], // светлое утро
+
+    // ===== Дневное плато =====
+    [12.0,           '#fff1d6'], // полдень — светлый кремово-белый
+    [13.0,           '#fff1d6'], // плато
+    [14.0,           '#fff0d2'],
+
+    // ===== Послеобеденная тёплая фаза и закат =====
+    [sunset - 2.5,   '#fee9c2'],
+    [sunset - 1.5,   '#ffd9a8'],
+    [sunset - 0.8,   '#ffbe82'], // тёплый янтарь
+    [sunset - 0.4,   '#ff9a5c'], // золотой час
+    [sunset - 0.15,  '#ff7547'], // насыщённый оранжевый
+    [sunset,         '#ff5e3e'], // закат — пик
+    [sunset + 0.15,  '#d34a5c'], // красно-розовый
+    [sunset + 0.3,   '#9c3a6c'], // лиловый
+    [sunset + 0.5,   '#5a2868'], // фиолетово-сумеречный
+    [sunset + 0.75,  '#3a2055'], // гражданские сумерки
+    [sunset + 1.0,   '#222048'], // навигационные
+    [sunset + 1.5,   '#13183a'], // астрономические
+    [sunset + 2.0,   '#08102a'], // ночь
+  ];
+
+  // Группируем фазы относительно окна просмотра: что вне — клампим к краю,
+  // оставляем только последнюю фазу слева и первую справа.
+  let leftColor = null;
+  let rightColor = null;
+  const inView = [];
+  for (const [h, c] of phases) {
+    if (h <= VS) { leftColor = c; continue; }
+    if (h >= VE) { if (!rightColor) rightColor = c; continue; }
+    inView.push([pct(h), c]);
+  }
   const stops = [];
-  // Левый край
-  if (sunrise <= VS - 0.5) {
-    stops.push(`${COLOR.morning} 0%`);
-  } else if (sunrise <= VS) {
-    stops.push(`${COLOR.dawnPeak} 0%`);
-    stops.push(`${COLOR.morning} ${clamp(pct(sunrise + 1))}%`);
-  } else {
-    stops.push(`${COLOR.night} 0%`);
-    stops.push(`${COLOR.night} ${clamp(pct(sunrise - 0.6))}%`);
-    stops.push(`${COLOR.twilightDawn} ${clamp(pct(sunrise - 0.25))}%`);
-    stops.push(`${COLOR.dawnPeak} ${clamp(pct(sunrise))}%`);
-    stops.push(`${COLOR.morning} ${clamp(pct(sunrise + 1))}%`);
-  }
-  // Полдень
-  stops.push(`${COLOR.midday} ${clamp(pct(13))}%`);
-  // Правый край (закат)
-  if (sunset >= VE) {
-    stops.push(`${COLOR.afternoon} 100%`);
-  } else if (sunset >= VE - 0.5) {
-    stops.push(`${COLOR.afternoon} ${clamp(pct(sunset - 1))}%`);
-    stops.push(`${COLOR.sunsetPeak} 100%`);
-  } else {
-    stops.push(`${COLOR.afternoon} ${clamp(pct(sunset - 1))}%`);
-    stops.push(`${COLOR.sunsetPeak} ${clamp(pct(sunset))}%`);
-    stops.push(`${COLOR.twilightDusk} ${clamp(pct(sunset + 0.25))}%`);
-    stops.push(`${COLOR.night} ${clamp(pct(sunset + 0.6))}%`);
-    stops.push(`${COLOR.night} 100%`);
-  }
+  if (leftColor) stops.push(`${leftColor} 0%`);
+  else if (inView.length) stops.push(`${inView[0][1]} 0%`);
+  for (const [p, c] of inView) stops.push(`${c} ${p.toFixed(2)}%`);
+  if (rightColor) stops.push(`${rightColor} 100%`);
+  else if (inView.length) stops.push(`${inView[inView.length-1][1]} 100%`);
+  if (stops.length === 0) stops.push('#08102a 0%', '#08102a 100%');
+
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 }
 
