@@ -461,6 +461,7 @@
     <div class="offline-pill" id="offline-pill">Офлайн — изменения сохранятся локально и синхронизируются позже</div>
     <div id="diag-banner" style="display:none; margin:0 0 10px; padding:10px 12px; background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.35); color:#fca5a5; border-radius:10px; font-size:12.5px; line-height:1.4;"></div>
     <div id="stale-banner" style="display:none; margin:0 0 10px; padding:12px 14px; background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.4); color:#fcd34d; border-radius:10px; font-size:13px; line-height:1.45;"></div>
+    <div id="stuck-banner" style="display:none; margin:0 0 10px; padding:12px 14px; background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.4); color:#fcd34d; border-radius:10px; font-size:13px; line-height:1.45;"></div>
     <div class="timeline-card">
       <div class="timeline-track" id="timeline-track"></div>
       <div class="timeline-axis" id="timeline-axis"></div>
@@ -1582,9 +1583,10 @@ async function processQueue() {
       } catch (e) {
         item.attempts = (item.attempts || 0) + 1;
         item.lastError = String(e.message || e);
+        item.firstFailedAt = item.firstFailedAt || Date.now();
         saveQueue();
         console.warn('queue item failed (attempt ' + item.attempts + '):', item, e);
-        if (item.attempts >= 5) { queue.shift(); saveQueue(); continue; }
+        // Не дропаем — пусть лучше копится в очереди, чем терять данные
         break;
       }
     }
@@ -1592,7 +1594,27 @@ async function processQueue() {
   } finally {
     queueProcessing = false;
   }
+  updateStuckBanner();
   if (drained && session) syncSoon();
+}
+
+function updateStuckBanner() {
+  const banner = document.getElementById('stuck-banner');
+  if (!banner) return;
+  if (queue.length === 0) { banner.style.display = 'none'; return; }
+  // Самый старый зависший item
+  const stuckMs = queue.reduce((oldest, it) => {
+    if (!it.firstFailedAt) return oldest;
+    return Math.min(oldest, it.firstFailedAt);
+  }, Date.now());
+  const ageSec = Math.floor((Date.now() - stuckMs) / 1000);
+  if (ageSec < 60) { banner.style.display = 'none'; return; }
+  banner.style.display = 'block';
+  banner.innerHTML = `
+    ⚠ ${queue.length} ${queue.length === 1 ? 'изменение не отправлено' : 'изменений не отправлены'} на сервер (${ageSec >= 60 ? Math.floor(ageSec/60) + ' мин' : ageSec + ' с'}).<br>
+    <button onclick="processQueue()" style="margin-top:8px; padding:8px 12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:#fcd34d; border-radius:8px; font-size:12.5px; cursor:pointer;">Попробовать сейчас</button>
+    <button onclick="if(confirm('Удалить зависшие изменения? Они не будут синхронизированы.')) { window.clearQueue(); document.getElementById('stuck-banner').style.display='none'; }" style="margin-top:8px; margin-left:8px; padding:8px 12px; background:transparent; border:1px solid rgba(255,255,255,0.18); color:#fcd34d; border-radius:8px; font-size:12.5px; cursor:pointer;">Отменить</button>
+  `;
 }
 
 function setOnlineState() {
@@ -1603,6 +1625,8 @@ window.addEventListener('online', setOnlineState);
 window.addEventListener('offline', setOnlineState);
 // Агрессивный ретрай — каждые 5с пока есть pending
 setInterval(() => { if (queue.length > 0 && navigator.onLine) processQueue(); }, 5000);
+// Обновление баннера зависших каждые 15с
+setInterval(() => updateStuckBanner(), 15000);
 
 // При возврате PWA/вкладки на экран — пересинкаемся (realtime мог отвалиться в фоне)
 document.addEventListener('visibilitychange', () => {
@@ -1663,6 +1687,8 @@ window.deleteEntry = deleteEntry;
 window.syncSoon = syncSoon;
 window.processQueue = processQueue;
 window.getQueue = () => queue;
+window.clearQueue = () => { queue.length = 0; saveQueue(); };
+window.updateStuckBanner = () => updateStuckBanner();
 
 /* ---------- Boot ---------- */
 // Если есть кэш — показываем дашборд мгновенно, не дожидаясь сети
