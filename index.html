@@ -252,9 +252,27 @@
   .stats-bar > div { height: 100%; border-radius: 2px; }
   .stats-empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 13px; }
 
-  /* Timeline — 24h, top of screen, no card chrome */
+  /* Timeline — 06:00 → 24:00, top of screen, no card chrome */
   .timeline-card { padding: 0; margin: 0 0 18px; background: transparent; border: 0; }
   .timeline-head, .timeline-legend { display: none; }
+
+  /* Daylight strip — реальное солнце SPB */
+  .timeline-daylight {
+    position: relative;
+    height: 12px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background: var(--surface-2);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.07),
+      0 1px 3px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  .timeline-daylight::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(0,0,0,0.18) 100%);
+    pointer-events: none;
+  }
   .timeline-track {
     position: relative;
     height: 52px;
@@ -463,6 +481,7 @@
     <div id="stale-banner" style="display:none; margin:0 0 10px; padding:12px 14px; background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.4); color:#fcd34d; border-radius:10px; font-size:13px; line-height:1.45;"></div>
     <div id="stuck-banner" style="display:none; margin:0 0 10px; padding:12px 14px; background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.4); color:#fcd34d; border-radius:10px; font-size:13px; line-height:1.45;"></div>
     <div class="timeline-card">
+      <div class="timeline-daylight" id="timeline-daylight"></div>
       <div class="timeline-track" id="timeline-track"></div>
       <div class="timeline-axis" id="timeline-axis"></div>
     </div>
@@ -680,7 +699,94 @@ function renderGrid() {
   renderTimeline();
 }
 
-/* ---------- Timeline (today, smart range) ---------- */
+/* ---------- Timeline (today, 06:00 → 24:00) ---------- */
+const TIMELINE_START_HOUR = 6;
+
+// Восход и закат в Санкт-Петербурге (lat ≈ 60° N).
+// Таблица с шагом ~30 дней, между точками — линейная интерполяция.
+// Часы в местном времени (MSK, UTC+3).
+const SPB_SUN = [
+  // [day-of-year, sunrise hours, sunset hours]
+  [1,   9.97, 16.07],   // 1 Jan
+  [32,  8.97, 17.05],   // 1 Feb
+  [60,  7.78, 17.95],   // 1 Mar
+  [91,  6.42, 19.78],   // 1 Apr
+  [121, 5.05, 20.65],   // 1 May
+  [152, 4.00, 22.40],   // 1 Jun
+  [173, 3.58, 22.42],   // 22 Jun (longest day)
+  [182, 3.80, 22.30],   // 1 Jul
+  [213, 4.92, 21.40],   // 1 Aug
+  [244, 6.22, 19.85],   // 1 Sep
+  [274, 7.53, 18.43],   // 1 Oct
+  [305, 8.85, 17.02],   // 1 Nov
+  [335, 9.72, 15.92],   // 1 Dec
+  [355, 10.02, 15.85],  // 21 Dec (shortest day)
+  [366, 9.97, 16.07],   // wrap
+];
+function dayOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+function getSunriseSunset(date) {
+  const d = dayOfYear(date);
+  for (let i = 1; i < SPB_SUN.length; i++) {
+    const [d2, sr2, ss2] = SPB_SUN[i];
+    if (d <= d2) {
+      const [d1, sr1, ss1] = SPB_SUN[i-1];
+      const t = (d - d1) / (d2 - d1);
+      return { sunrise: sr1 + (sr2 - sr1) * t, sunset: ss1 + (ss2 - ss1) * t };
+    }
+  }
+  return { sunrise: 9.97, sunset: 16.07 };
+}
+function buildDaylightGradient(date) {
+  const { sunrise, sunset } = getSunriseSunset(date);
+  const VS = TIMELINE_START_HOUR, VE = 24;
+  const span = VE - VS;
+  const pct = h => ((h - VS) / span) * 100;
+  const clamp = p => Math.max(0, Math.min(100, p));
+  const COLOR = {
+    night:        '#0d1124',
+    twilightDawn: '#3a2455',
+    dawnPeak:     '#ff7b3a',
+    morning:      '#ffce6b',
+    midday:       '#ffe9b3',
+    afternoon:    '#ffce6b',
+    sunsetPeak:   '#ff5722',
+    twilightDusk: '#3a2455',
+  };
+  const stops = [];
+  // Левый край
+  if (sunrise <= VS - 0.5) {
+    stops.push(`${COLOR.morning} 0%`);
+  } else if (sunrise <= VS) {
+    stops.push(`${COLOR.dawnPeak} 0%`);
+    stops.push(`${COLOR.morning} ${clamp(pct(sunrise + 1))}%`);
+  } else {
+    stops.push(`${COLOR.night} 0%`);
+    stops.push(`${COLOR.night} ${clamp(pct(sunrise - 0.6))}%`);
+    stops.push(`${COLOR.twilightDawn} ${clamp(pct(sunrise - 0.25))}%`);
+    stops.push(`${COLOR.dawnPeak} ${clamp(pct(sunrise))}%`);
+    stops.push(`${COLOR.morning} ${clamp(pct(sunrise + 1))}%`);
+  }
+  // Полдень
+  stops.push(`${COLOR.midday} ${clamp(pct(13))}%`);
+  // Правый край (закат)
+  if (sunset >= VE) {
+    stops.push(`${COLOR.afternoon} 100%`);
+  } else if (sunset >= VE - 0.5) {
+    stops.push(`${COLOR.afternoon} ${clamp(pct(sunset - 1))}%`);
+    stops.push(`${COLOR.sunsetPeak} 100%`);
+  } else {
+    stops.push(`${COLOR.afternoon} ${clamp(pct(sunset - 1))}%`);
+    stops.push(`${COLOR.sunsetPeak} ${clamp(pct(sunset))}%`);
+    stops.push(`${COLOR.twilightDusk} ${clamp(pct(sunset + 0.25))}%`);
+    stops.push(`${COLOR.night} ${clamp(pct(sunset + 0.6))}%`);
+    stops.push(`${COLOR.night} 100%`);
+  }
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+}
+
 function renderTimeline() {
   const track = document.getElementById('timeline-track');
   const axis = document.getElementById('timeline-axis');
@@ -690,30 +796,34 @@ function renderTimeline() {
   const dayEnd = new Date(dayStart.getTime() + 86400000);
   const nowDate = new Date();
 
-  // Сегодняшние сегменты (entries + active)
+  // Окно просмотра — 06:00 → 24:00
+  const viewStart = new Date(dayStart.getTime() + TIMELINE_START_HOUR * 3600000);
+  const viewEnd = dayEnd;
+
+  // Сегодняшние сегменты, обрезанные по окну
   const segs = [];
   state.entries.forEach(e => {
     const s = new Date(e.start), en = new Date(e.end);
-    if (en <= dayStart || s >= dayEnd) return;
-    segs.push({ catId: e.catId, start: Math.max(s, dayStart), end: Math.min(en, dayEnd) });
+    if (en <= viewStart || s >= viewEnd) return;
+    segs.push({ catId: e.catId, start: Math.max(s, viewStart), end: Math.min(en, viewEnd) });
   });
   if (state.active) {
     const s = new Date(state.active.start);
     const en = nowDate;
-    if (en > dayStart && s < dayEnd) {
-      segs.push({ catId: state.active.catId, start: Math.max(s, dayStart), end: Math.min(en, dayEnd), active: true });
+    if (en > viewStart && s < viewEnd) {
+      segs.push({ catId: state.active.catId, start: Math.max(s, viewStart), end: Math.min(en, viewEnd), active: true });
     }
   }
 
-  // Полные сутки: 00:00 — 24:00
-  const viewStart = dayStart;
-  const viewEnd = dayEnd;
   const viewSpan = viewEnd - viewStart;
   const pct = (t) => ((t - viewStart) / viewSpan) * 100;
 
-  // Сегменты
+  // Daylight strip
+  const daylight = document.getElementById('timeline-daylight');
+  if (daylight) daylight.style.backgroundImage = buildDaylightGradient(nowDate);
+
+  // Сегменты (визуально клиппятся к окну 06:00 — 24:00)
   track.innerHTML = '';
-  const totals = {};
   segs.forEach(s => {
     const c = catById(s.catId);
     if (!c) return;
@@ -726,8 +836,9 @@ function renderTimeline() {
     const dur = (s.end - s.start);
     div.title = `${c.name} · ${fmtTime(new Date(s.start))}–${s.active ? 'сейчас' : fmtTime(new Date(s.end))} · ${fmtDur(dur)}`;
     track.appendChild(div);
-    totals[s.catId] = (totals[s.catId] || 0) + dur;
   });
+  // Totals для блока «Сегодня» — за полные сутки (включая ночь)
+  const totals = aggregate(dayStart, dayEnd);
 
   // "Сейчас" маркер (только если nowDate в окне)
   if (nowDate >= viewStart && nowDate <= viewEnd) {
@@ -737,15 +848,25 @@ function renderTimeline() {
     track.appendChild(nowMark);
   }
 
-  // Ось часов: 24h → тики каждые 3 часа, с лейблом каждые 6 в формате "18:00"
+  // Ось часов: 06:00 → 24:00, тики каждые 3 часа. Лейблы: 06, 12, 18, 00 (полночь)
   axis.innerHTML = '';
-  for (let h = 0; h <= 24; h += 3) {
+  for (let h = TIMELINE_START_HOUR; h <= 24; h += 3) {
     const t = new Date(dayStart.getTime() + h * 3600000);
     const tick = document.createElement('div');
-    tick.className = 'timeline-tick' + (h % 6 === 0 ? ' major' : '');
-    tick.style.left = pct(t) + '%';
-    if (h % 6 === 0 && h !== 0 && h !== 24) {
-      tick.textContent = String(h).padStart(2, '0') + ':00';
+    const isMajor = (h === TIMELINE_START_HOUR || h === 12 || h === 18 || h === 24);
+    tick.className = 'timeline-tick' + (isMajor ? ' major' : '');
+    if (h === TIMELINE_START_HOUR) {
+      tick.style.left = '0%';
+      tick.style.transform = 'translateX(0)';
+    } else if (h === 24) {
+      tick.style.left = '100%';
+      tick.style.transform = 'translateX(-100%)';
+    } else {
+      tick.style.left = pct(t) + '%';
+    }
+    if (isMajor) {
+      const hh = h === 24 ? 0 : h;
+      tick.textContent = String(hh).padStart(2, '0') + ':00';
     }
     axis.appendChild(tick);
   }
