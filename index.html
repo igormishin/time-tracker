@@ -527,6 +527,7 @@
 
   <!-- HISTORY TAB -->
   <section id="tab-history" class="hidden">
+    <button class="btn secondary" onclick="openAddEntry()" style="margin-bottom: 14px;">+ Добавить запись</button>
     <div id="history-list"></div>
   </section>
 
@@ -573,7 +574,7 @@
 <!-- Edit entry modal -->
 <div id="edit-modal" class="modal-bg hidden" onclick="if(event.target===this) closeEdit()">
   <div class="modal">
-    <h3 class="modal-title">Редактировать запись <button onclick="closeEdit()">Закрыть</button></h3>
+    <h3 class="modal-title"><span id="edit-modal-title">Редактировать запись</span> <button onclick="closeEdit()">Закрыть</button></h3>
     <div class="field">
       <label>Категория</label>
       <select id="edit-cat"></select>
@@ -589,7 +590,7 @@
       </div>
     </div>
     <button class="btn" onclick="saveEdit()">Сохранить</button>
-    <button class="btn danger" onclick="deleteEntry()">Удалить</button>
+    <button class="btn danger" id="edit-modal-delete" onclick="deleteEntry()">Удалить</button>
   </div>
 </div>
 
@@ -1255,25 +1256,67 @@ function fmtTime(d) {
 }
 
 /* ---------- Edit entry ---------- */
-function openEdit(id) {
-  editingEntryId = id;
-  const e = state.entries.find(x => x.id === id);
-  if (!e) return;
+let editingMode = 'edit'; // 'edit' | 'new'
+
+function _populateEditCatSelect(selectedId) {
   const sel = document.getElementById('edit-cat');
   sel.innerHTML = '';
   state.categories.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id; opt.textContent = c.name;
-    if (c.id === e.catId) opt.selected = true;
+    if (c.id === selectedId) opt.selected = true;
     sel.appendChild(opt);
   });
+}
+
+function openEdit(id) {
+  editingMode = 'edit';
+  editingEntryId = id;
+  const e = state.entries.find(x => x.id === id);
+  if (!e) return;
+  _populateEditCatSelect(e.catId);
   document.getElementById('edit-start').value = toLocalInput(new Date(e.start));
   document.getElementById('edit-end').value = toLocalInput(new Date(e.end));
+  document.getElementById('edit-modal-title').textContent = 'Редактировать запись';
+  document.getElementById('edit-modal-delete').style.display = '';
   document.getElementById('edit-modal').classList.remove('hidden');
 }
+
+function openAddEntry() {
+  editingMode = 'new';
+  editingEntryId = null;
+  // Дефолт: последний час, текущая (или первая) категория
+  const end = new Date();
+  const start = new Date(end.getTime() - 3600000);
+  const defaultCatId = state.active?.catId || state.categories[0]?.id;
+  _populateEditCatSelect(defaultCatId);
+  document.getElementById('edit-start').value = toLocalInput(start);
+  document.getElementById('edit-end').value = toLocalInput(end);
+  document.getElementById('edit-modal-title').textContent = 'Новая запись';
+  document.getElementById('edit-modal-delete').style.display = 'none';
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
 function closeEdit() {
-  // Автосохранение если значения валидны и изменились
-  if (editingEntryId) {
+  // Автосохранение/создание при закрытии
+  if (editingMode === 'new') {
+    const s = new Date(document.getElementById('edit-start').value);
+    const en = new Date(document.getElementById('edit-end').value);
+    const cat = document.getElementById('edit-cat').value;
+    if (!isNaN(s) && !isNaN(en) && en > s && cat && session) {
+      const id = newId();
+      const entry = { id, catId: cat, start: s.toISOString(), end: en.toISOString() };
+      state.entries.unshift(entry);
+      saveCache();
+      mutate({ op: 'insert', table: 'entries', payload: {
+        id, user_id: session.user.id, category_id: cat,
+        start_at: entry.start, end_at: entry.end
+      }});
+      renderHistory();
+      if (currentTab === 'track') renderGrid();
+      if (currentTab === 'stats') renderStats();
+    }
+  } else if (editingEntryId) {
     const e = state.entries.find(x => x.id === editingEntryId);
     if (e) {
       const s = new Date(document.getElementById('edit-start').value);
@@ -1297,14 +1340,18 @@ function closeEdit() {
   }
   document.getElementById('edit-modal').classList.add('hidden');
   editingEntryId = null;
+  editingMode = 'edit';
 }
+
 function saveEdit() {
-  // Кнопка "Сохранить" — то же самое что закрытие, но с явным фидбеком при ошибке
-  const e = state.entries.find(x => x.id === editingEntryId);
-  if (!e) { closeEdit(); return; }
+  // Валидация перед закрытием
   const s = new Date(document.getElementById('edit-start').value);
   const en = new Date(document.getElementById('edit-end').value);
   if (isNaN(s) || isNaN(en) || en <= s) { alert('Неверные даты'); return; }
+  if (editingMode === 'edit') {
+    const e = state.entries.find(x => x.id === editingEntryId);
+    if (!e) { closeEdit(); return; }
+  }
   closeEdit();
 }
 function deleteEntry() {
@@ -1822,6 +1869,7 @@ window.getCurrentTab = () => currentTab;
 window.forceStopActive = forceStopActive;
 window.toggleCategory = toggleCategory;
 window.openEdit = openEdit;
+window.openAddEntry = openAddEntry;
 window.deleteEntry = deleteEntry;
 window.syncSoon = syncSoon;
 window.processQueue = processQueue;
