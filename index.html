@@ -1611,6 +1611,7 @@ async function applySession(s) {
       }
     }
   } else {
+    console.log('[applySession] WIPING STATE (called with null session). Stack:', new Error().stack?.split('\n').slice(1,5).join(' | '));
     html.classList.remove('authed');
     if (realtime) { sb.removeChannel(realtime); realtime = null; }
     state = { categories: [], entries: [], active: null, warnMinutes: 25 };
@@ -1679,6 +1680,7 @@ async function loadAll() {
   state.categories = (cats.data || []).map(c => ({
     id: c.id, name: c.name, color: c.color, position: c.position
   }));
+  console.log('[loadAll] cats fetched=' + state.categories.length + ' (raw rows=' + (cats.data?.length || 0) + ')');
   // После категорий уже можно частично рендерить
   saveCache(); renderGrid();
 
