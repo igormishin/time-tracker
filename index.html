@@ -1573,16 +1573,19 @@ async function applySession(s) {
       document.getElementById('user-email').textContent = s.user.email;
       html.classList.add('authed');
       // 1. Мгновенный рендер из кэша если есть
+      console.log('[applySession] step 1 cache');
       if (loadCache()) renderGrid();
+      console.log('[applySession] step 2 badge');
       updateQueueBadge();
-      // Если есть pending — гоняем их в фоне, не блокируя загрузку
+      console.log('[applySession] step 3 queue');
       if (queue.length > 0) processQueue();
-      // 2. Фоновое обновление с сервера (СНАЧАЛА данные, потом realtime —
-      //    чтобы реалтайм-шторм CLOSED не блокировал event loop при загрузке)
+      console.log('[applySession] step 4 loadAll start');
       await loadAll();
+      console.log('[applySession] step 5 loadAll done, cats=' + state.categories.length);
       saveCache();
       renderGrid();
       setupRealtime();
+      console.log('[applySession] step 6 done');
       // Диагностика: если данные пустые — показываем баннер
       const diag = document.getElementById('diag-banner');
       if (diag) {
