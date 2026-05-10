@@ -1875,7 +1875,9 @@ window.syncSoon = syncSoon;
 window.processQueue = processQueue;
 window.getQueue = () => queue;
 window.clearQueue = () => { queue.length = 0; saveQueue(); };
-window.updateStuckBanner = () => updateStuckBanner();
+// Не оборачиваем — иначе window.X = () => X() даёт бесконечную рекурсию,
+// потому что function declaration кладёт X на window и арроу вызывает сама себя.
+// Прямое присваивание ссылки решает проблему.
 
 /* ---------- Boot ---------- */
 // Если есть кэш — показываем дашборд мгновенно, не дожидаясь сети
