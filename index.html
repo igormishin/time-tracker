@@ -1573,19 +1573,13 @@ async function applySession(s) {
       document.getElementById('user-email').textContent = s.user.email;
       html.classList.add('authed');
       // 1. Мгновенный рендер из кэша если есть
-      console.log('[applySession] step 1 cache');
       if (loadCache()) renderGrid();
-      console.log('[applySession] step 2 badge');
       updateQueueBadge();
-      console.log('[applySession] step 3 queue');
       if (queue.length > 0) processQueue();
-      console.log('[applySession] step 4 loadAll start');
       await loadAll();
-      console.log('[applySession] step 5 loadAll done, cats=' + state.categories.length);
       saveCache();
       renderGrid();
       setupRealtime();
-      console.log('[applySession] step 6 done');
       // Диагностика: если данные пустые — показываем баннер
       const diag = document.getElementById('diag-banner');
       if (diag) {
@@ -1611,12 +1605,15 @@ async function applySession(s) {
       }
     }
   } else {
-    console.log('[applySession] WIPING STATE (called with null session). Stack:', new Error().stack?.split('\n').slice(1,5).join(' | '));
     html.classList.remove('authed');
     if (realtime) { sb.removeChannel(realtime); realtime = null; }
-    state = { categories: [], entries: [], active: null, warnMinutes: 25 };
+    // МУТИРУЕМ state, а не реассайн — window.state и другие ссылки должны остаться актуальными
+    state.categories.length = 0;
+    state.entries.length = 0;
+    state.active = null;
+    state.warnMinutes = 25;
     try { localStorage.removeItem(CACHE_KEY); localStorage.removeItem(QUEUE_KEY); } catch {}
-    queue = [];
+    queue.length = 0;
     updateQueueBadge();
   }
 }
@@ -1677,10 +1674,11 @@ async function loadAll() {
     30000, 'categories'
   );
   if (cats.error) throw new Error('categories: ' + cats.error.message);
-  state.categories = (cats.data || []).map(c => ({
+  // МУТИРУЕМ массивы вместо реассайна, чтобы window.state и подписчики оставались актуальными
+  state.categories.length = 0;
+  (cats.data || []).forEach(c => state.categories.push({
     id: c.id, name: c.name, color: c.color, position: c.position
   }));
-  console.log('[loadAll] cats fetched=' + state.categories.length + ' (raw rows=' + (cats.data?.length || 0) + ')');
   // После категорий уже можно частично рендерить
   saveCache(); renderGrid();
 
@@ -1696,7 +1694,7 @@ async function loadAll() {
   if (ents.error)     throw new Error('entries: ' + ents.error.message);
   if (settings.error) throw new Error('settings: ' + settings.error.message);
 
-  state.entries = [];
+  state.entries.length = 0;
   state.active = null;
   (ents.data || []).forEach(e => {
     if (e.end_at === null) {
