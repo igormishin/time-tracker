@@ -1522,7 +1522,11 @@ async function bootAuth() {
       } catch (e) { console.warn('refreshSession failed, using existing:', e); }
     }
     await applySession(s);
-    sb.auth.onAuthStateChange(async (_event, ses) => { await applySession(ses); });
+    // Подписываемся только на явный SIGNED_OUT (например, токен протух)
+    // Логин и token refresh уже триггерят applySession через signInPassword/getSession.
+    sb.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') applySession(null);
+    });
   } catch (e) {
     console.error('bootAuth failed:', e);
     // Если есть кэш — тихо логируем, юзера не пугаем
