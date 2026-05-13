@@ -33,6 +33,9 @@ create table if not exists public.backups (
 create index if not exists backups_user_created_idx
   on public.backups(user_id, created_at desc);
 
+-- Data API access (явные GRANT для совместимости с правилами после Oct 30 2026)
+grant select on public.backups to authenticated;
+
 alter table public.backups enable row level security;
 
 drop policy if exists "backups_select_own" on public.backups;

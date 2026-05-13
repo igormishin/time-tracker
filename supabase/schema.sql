@@ -38,6 +38,13 @@ create table if not exists public.settings (
 );
 
 -- ============================================================
+-- Data API access (явные GRANT — обязательно для проектов > Oct 30 2026)
+-- ============================================================
+grant select, insert, update, delete on public.categories to authenticated;
+grant select, insert, update, delete on public.entries    to authenticated;
+grant select, insert, update, delete on public.settings   to authenticated;
+
+-- ============================================================
 -- Row Level Security — пользователь видит только свои данные
 -- ============================================================
 alter table public.categories enable row level security;
