@@ -34,6 +34,8 @@ create index if not exists backups_user_created_idx
   on public.backups(user_id, created_at desc);
 
 -- Data API access (явные GRANT для совместимости с правилами после Oct 30 2026)
+-- backups: только SELECT для authenticated; INSERT/DELETE — через SECURITY DEFINER функции.
+revoke all  on public.backups from anon, authenticated;
 grant select on public.backups to authenticated;
 
 alter table public.backups enable row level security;
@@ -99,6 +101,11 @@ begin
 
   return cnt;
 end $$;
+
+-- SECURITY DEFINER functions — вызываются только server-side (cron + вложенный вызов).
+-- Закрываем REST-доступ для anon/authenticated.
+revoke execute on function public.create_user_snapshot(uuid) from public, anon, authenticated;
+revoke execute on function public.snapshot_all_users()       from public, anon, authenticated;
 
 -- ---------- 7. pg_cron: ежедневный запуск в 03:00 UTC (06:00 MSK) ----------
 create extension if not exists pg_cron;

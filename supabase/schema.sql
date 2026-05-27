@@ -39,10 +39,13 @@ create table if not exists public.settings (
 
 -- ============================================================
 -- Data API access (явные GRANT — обязательно для проектов > Oct 30 2026)
+-- anon не получает прав: приложение требует логин.
 -- ============================================================
+revoke all on public.categories, public.entries, public.settings from anon, authenticated;
 grant select, insert, update, delete on public.categories to authenticated;
 grant select, insert, update, delete on public.entries    to authenticated;
 grant select, insert, update, delete on public.settings   to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
 
 -- ============================================================
 -- Row Level Security — пользователь видит только свои данные
@@ -125,6 +128,11 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.seed_defaults_for_user();
+
+-- Trigger function — нужен только supabase_auth_admin при signup,
+-- никаких REST-вызовов от anon/authenticated.
+revoke execute on function public.seed_defaults_for_user() from public, anon, authenticated;
+grant  execute on function public.seed_defaults_for_user() to supabase_auth_admin;
 
 -- ============================================================
 -- Realtime: включить публикацию изменений
