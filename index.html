@@ -226,14 +226,53 @@
   }
   .range-switch button:hover { color: var(--text); }
   .range-switch button.active { background: var(--bg); color: var(--text-strong); box-shadow: 0 1px 0 rgba(255,255,255,0.04); }
-  .range-dates { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
-  .range-dates input[type="date"] {
-    flex: 1; padding: 9px 11px; font-size: 13px;
+  /* Range picker (custom calendar) */
+  .range-picker { position: relative; margin-bottom: 14px; }
+  .range-field {
+    width: 100%; display: flex; align-items: center; gap: 9px;
+    padding: 9px 12px; font-size: 13px; text-align: left;
     background: var(--surface); border: 1px solid var(--border-strong);
-    border-radius: 8px; color: var(--text);
-    color-scheme: dark;
+    border-radius: 8px; color: var(--text); letter-spacing: -0.005em;
+    transition: border-color .15s, color .15s;
   }
-  .range-dash { color: var(--muted); font-size: 13px; }
+  .range-field:hover { border-color: var(--muted-2); color: var(--text-strong); }
+  .range-field.open { border-color: var(--muted); color: var(--text-strong); }
+  .range-field svg { width: 15px; height: 15px; flex: none; color: var(--muted); }
+  .cal {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 12px; padding: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+  }
+  .cal.hidden { display: none; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-title { font-size: 13px; font-weight: 600; color: var(--text-strong); letter-spacing: -0.01em; }
+  .cal-nav {
+    width: 28px; height: 28px; border-radius: 7px; color: var(--muted);
+    font-size: 17px; line-height: 1; transition: background .15s, color .15s;
+  }
+  .cal-nav:hover { background: var(--surface-2); color: var(--text-strong); }
+  .cal-dow, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-dow { margin-bottom: 4px; }
+  .cal-dow span {
+    text-align: center; font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted-2); padding: 4px 0;
+  }
+  .cal-grid { row-gap: 2px; }
+  .cal-day {
+    position: relative; height: 32px; font-size: 12.5px; color: var(--text);
+    font-variant-numeric: tabular-nums; border-radius: 7px;
+    transition: background .12s, color .12s;
+  }
+  .cal-day.out { color: var(--muted-2); }
+  .cal-day:hover { background: var(--surface-2); color: var(--text-strong); }
+  .cal-day.in-range { background: var(--surface-2); border-radius: 0; }
+  .cal-day.edge { background: var(--accent); color: #fff; border-radius: 7px; font-weight: 600; }
+  .cal-day.edge:hover { background: var(--accent); color: #fff; }
+  .cal-day.today::after {
+    content: ''; position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
+    width: 3px; height: 3px; border-radius: 50%; background: currentColor;
+  }
+  .cal-hint { margin-top: 10px; font-size: 11.5px; color: var(--muted); text-align: center; }
   .stats-total-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
   .stats-total-row .stats-total { margin: 0; }
   .stats-range-label { color: var(--muted); font-size: 12px; letter-spacing: -0.01em; text-align: right; }
@@ -506,15 +545,26 @@
   <!-- STATS TAB -->
   <section id="tab-stats" class="hidden">
     <div class="range-switch">
-      <button class="active" data-range="day" onclick="setRange('day')">Сегодня</button>
+      <button data-range="day" onclick="setRange('day')">Сегодня</button>
       <button data-range="yesterday" onclick="setRange('yesterday')">Вчера</button>
       <button data-range="week" onclick="setRange('week')">7 дней</button>
-      <button data-range="month" onclick="setRange('month')">30 дней</button>
+      <button class="active" data-range="month" onclick="setRange('month')">Этот месяц</button>
     </div>
-    <div class="range-dates">
-      <input type="date" id="range-from" oninput="onCustomRange()" />
-      <span class="range-dash">—</span>
-      <input type="date" id="range-to" oninput="onCustomRange()" />
+    <div class="range-picker" id="range-picker">
+      <button type="button" class="range-field" id="range-field" onclick="toggleRangePicker(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        <span id="range-field-text">—</span>
+      </button>
+      <div class="cal hidden" id="range-cal">
+        <div class="cal-head">
+          <button type="button" class="cal-nav" onclick="calShift(-1)" aria-label="Предыдущий месяц">‹</button>
+          <div class="cal-title" id="cal-title"></div>
+          <button type="button" class="cal-nav" onclick="calShift(1)" aria-label="Следующий месяц">›</button>
+        </div>
+        <div class="cal-dow"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-hint" id="cal-hint"></div>
+      </div>
     </div>
     <div class="stats">
       <div class="stats-total-row">
@@ -618,9 +668,19 @@ let state = {
 };
 
 let currentTab = 'track';
-let currentRange = 'day';
+let currentRange = 'month';   // по умолчанию — текущий календарный месяц
 let editingEntryId = null;
 let tickInterval = null;
+
+// Состояние кастомного date picker'а
+let customFrom = null;   // Date, начало выбранного периода
+let customTo = null;     // Date, конец выбранного периода
+let selStart = null;     // подсвеченное начало в календаре
+let selEnd = null;       // подсвеченный конец в календаре
+let pendingStart = null; // начало, выбранное первым кликом (ждём второй)
+let calHover = null;     // день под курсором для превью периода
+let calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calCells = [];       // [{btn, d}] — ноды сетки, переиспользуются при перекраске
 
 /* ---------- Helpers ---------- */
 const newId = () => (crypto?.randomUUID?.() || 'id-' + Date.now() + Math.random().toString(36).slice(2));
@@ -1065,27 +1125,14 @@ function setRange(r) {
   document.querySelectorAll('.range-switch button').forEach(b => {
     b.classList.toggle('active', b.dataset.range === r);
   });
-  // Синхронизируем date inputs с выбранным пресетом
-  if (r !== 'custom') {
-    const { from, to } = rangeBounds();
-    const fromInp = document.getElementById('range-from');
-    const toInp = document.getElementById('range-to');
-    if (fromInp) fromInp.value = toDateInputValue(from);
-    if (toInp)   toInp.value   = toDateInputValue(to);
-  }
+  closeRangePicker();
+  syncPickerToRange();
   renderStats();
 }
 
-function onCustomRange() {
-  currentRange = 'custom';
-  document.querySelectorAll('.range-switch button').forEach(b => b.classList.remove('active'));
-  renderStats();
-}
-
-function toDateInputValue(d) {
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
+function endOfMonth(d) { const x = new Date(d.getFullYear(), d.getMonth() + 1, 0); x.setHours(23,59,59,999); return x; }
+function endOfDay(d) { const x = startOfDay(d); x.setHours(23,59,59,999); return x; }
+function sameDay(a, b) { return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
 function rangeBounds() {
   const now = new Date();
@@ -1101,16 +1148,11 @@ function rangeBounds() {
     return { from: startOfDay(new Date(now.getTime() - 7 * 86400000)), to: now };
   }
   if (currentRange === 'month') {
-    return { from: startOfDay(new Date(now.getTime() - 30 * 86400000)), to: now };
+    // Текущий календарный месяц: с 1-го числа по последний день
+    return { from: startOfMonth(now), to: endOfMonth(now) };
   }
-  if (currentRange === 'custom') {
-    const fromV = document.getElementById('range-from')?.value;
-    const toV   = document.getElementById('range-to')?.value;
-    if (fromV && toV) {
-      const from = new Date(fromV); from.setHours(0,0,0,0);
-      const to   = new Date(toV);   to.setHours(23,59,59,999);
-      return { from, to };
-    }
+  if (currentRange === 'custom' && customFrom && customTo) {
+    return { from: startOfDay(customFrom), to: endOfDay(customTo) };
   }
   return { from: startOfDay(now), to: now };
 }
@@ -1121,9 +1163,149 @@ function rangeLabel() {
   if (currentRange === 'day')       return 'сегодня';
   if (currentRange === 'yesterday') return 'вчера';
   if (currentRange === 'week')      return `${fmt(from)} — сегодня`;
-  if (currentRange === 'month')     return `${fmt(from)} — сегодня`;
+  if (currentRange === 'month')     return `${fmt(from)} — ${fmt(to)}`;
   return `${fmt(from)} — ${fmt(new Date(to.getTime() - 1))}`;
 }
+
+/* ---------- Range picker (календарь: 1-й клик — начало, 2-й — конец) ---------- */
+function syncPickerToRange() {
+  const { from, to } = rangeBounds();
+  selStart = startOfDay(from);
+  const lastMs = startOfDay(new Date(to.getTime() - 1));
+  selEnd   = lastMs >= selStart ? lastMs : selStart;
+  pendingStart = null;
+  calMonth = new Date(selStart.getFullYear(), selStart.getMonth(), 1);
+  updateRangeField();
+  if (!document.getElementById('range-cal')?.classList.contains('hidden')) renderCal();
+}
+
+function updateRangeField() {
+  const el = document.getElementById('range-field-text');
+  if (!el) return;
+  const fmt = d => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (pendingStart) {
+    el.textContent = `${fmt(pendingStart)} — …`;
+  } else if (selStart && selEnd) {
+    el.textContent = sameDay(selStart, selEnd) ? fmt(selStart) : `${fmt(selStart)} — ${fmt(selEnd)}`;
+  } else {
+    el.textContent = 'Выбрать период';
+  }
+}
+
+function toggleRangePicker(ev) {
+  ev?.stopPropagation();
+  const cal = document.getElementById('range-cal');
+  if (!cal) return;
+  if (cal.classList.contains('hidden')) openRangePicker(); else closeRangePicker();
+}
+
+function openRangePicker() {
+  const cal = document.getElementById('range-cal');
+  if (!cal) return;
+  pendingStart = null;
+  calHover = null;
+  if (selStart) calMonth = new Date(selStart.getFullYear(), selStart.getMonth(), 1);
+  cal.classList.remove('hidden');
+  document.getElementById('range-field')?.classList.add('open');
+  renderCal();
+}
+
+function closeRangePicker() {
+  const cal = document.getElementById('range-cal');
+  if (!cal) return;
+  cal.classList.add('hidden');
+  document.getElementById('range-field')?.classList.remove('open');
+  pendingStart = null;
+  calHover = null;
+  updateRangeField();
+}
+
+function calShift(delta) {
+  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + delta, 1);
+  renderCal();
+}
+
+// Строим сетку месяца. Ноды создаются один раз — перекраска идёт через paintCal(),
+// иначе пересборка на hover съедала бы клик (mousedown и mouseup на разных нодах).
+function renderCal() {
+  const grid = document.getElementById('cal-grid');
+  const title = document.getElementById('cal-title');
+  if (!grid) return;
+
+  title.textContent = calMonth.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+
+  // Начинаем сетку с понедельника
+  const first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7;
+  const gridStart = new Date(first.getFullYear(), first.getMonth(), 1 - offset);
+
+  const today = startOfDay(new Date());
+  grid.innerHTML = '';
+  calCells = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cal-day';
+    btn.textContent = d.getDate();
+    if (d.getMonth() !== calMonth.getMonth()) btn.classList.add('out');
+    if (sameDay(d, today)) btn.classList.add('today');
+    btn.onclick = (ev) => { ev.stopPropagation(); pickDate(d); };
+    btn.onmouseenter = () => { if (pendingStart) { calHover = d; paintCal(); } };
+    grid.appendChild(btn);
+    calCells.push({ btn, d });
+  }
+  paintCal();
+}
+
+// Перекрашивает подсветку периода, не трогая ноды
+function paintCal() {
+  const hint = document.getElementById('cal-hint');
+  if (hint) hint.textContent = pendingStart ? 'Теперь выбери конец периода' : 'Выбери начало периода';
+
+  // Что подсвечиваем: подтверждённый период или превью от pendingStart к курсору
+  let hiFrom = selStart, hiTo = selEnd;
+  if (pendingStart) {
+    const other = calHover || pendingStart;
+    hiFrom = pendingStart <= other ? pendingStart : other;
+    hiTo   = pendingStart <= other ? other : pendingStart;
+  }
+
+  calCells.forEach(({ btn, d }) => {
+    const inside = hiFrom && hiTo && d >= hiFrom && d <= hiTo;
+    btn.classList.toggle('edge', !!inside && (sameDay(d, hiFrom) || sameDay(d, hiTo)));
+    btn.classList.toggle('in-range', !!inside && !sameDay(d, hiFrom) && !sameDay(d, hiTo));
+  });
+}
+
+function pickDate(d) {
+  if (!pendingStart) {
+    // Первый клик — начало периода
+    pendingStart = startOfDay(d);
+    calHover = null;
+    updateRangeField();
+    paintCal();
+    return;
+  }
+  // Второй клик — конец периода (порядок кликов не важен)
+  const a = pendingStart, b = startOfDay(d);
+  selStart = a <= b ? a : b;
+  selEnd   = a <= b ? b : a;
+  pendingStart = null;
+  calHover = null;
+
+  customFrom = selStart;
+  customTo = selEnd;
+  currentRange = 'custom';
+  document.querySelectorAll('.range-switch button').forEach(x => x.classList.remove('active'));
+  closeRangePicker();
+  renderStats();
+}
+
+document.addEventListener('click', (ev) => {
+  const picker = document.getElementById('range-picker');
+  if (picker && !picker.contains(ev.target)) closeRangePicker();
+});
 function renderStats() {
   const { from, to } = rangeBounds();
   const totals = aggregate(from, to);
