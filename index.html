@@ -547,7 +547,7 @@
     <div class="range-switch">
       <button data-range="day" onclick="setRange('day')">Сегодня</button>
       <button data-range="yesterday" onclick="setRange('yesterday')">Вчера</button>
-      <button data-range="week" onclick="setRange('week')">7 дней</button>
+      <button data-range="week" onclick="setRange('week')">Эта неделя</button>
       <button class="active" data-range="month" onclick="setRange('month')">Этот месяц</button>
     </div>
     <div class="range-picker" id="range-picker">
@@ -1145,7 +1145,8 @@ function rangeBounds() {
     return { from: yStart, to: yEnd };
   }
   if (currentRange === 'week') {
-    return { from: startOfDay(new Date(now.getTime() - 7 * 86400000)), to: now };
+    // Текущая неделя: с понедельника по текущий момент
+    return { from: startOfWeek(now), to: now };
   }
   if (currentRange === 'month') {
     // Текущий календарный месяц: с 1-го числа по последний день
