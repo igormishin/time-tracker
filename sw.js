@@ -2,7 +2,7 @@
 // Кеширует HTML/JS/иконки чтобы PWA запускалось без сети.
 // API запросы (Supabase) НЕ перехватываем — они идут напрямую.
 
-const CACHE = 'tracker-v8';
+const CACHE = 'tracker-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -27,6 +27,60 @@ self.addEventListener('activate', (e) => {
       .then(() => self.clients.claim())
   );
 });
+
+// Кнопки шторки. Страница подтверждает действие, чтобы повторный pull не переключил таймер дважды.
+let shadePending = null;
+let shadeSeq = 0;
+
+self.addEventListener('notificationclick', (event) => {
+  const action = event.action || '';
+  event.waitUntil(shadeClick(action));
+});
+
+self.addEventListener('notificationclose', (event) => {
+  if (!event.notification || event.notification.tag !== 'tracker-shade') return;
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const payload = event.notification.data || {};
+    all.forEach(client => client.postMessage({
+      type: 'shade-closed',
+      gen: payload.gen,
+      mode: payload.mode,
+    }));
+  })());
+});
+
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'shade-ack' && shadePending && data.id === shadePending.id) {
+    shadePending = null;
+    return;
+  }
+  if (data.type === 'shade-pull' && shadePending && event.source) {
+    event.source.postMessage({
+      type: 'shade-action',
+      action: shadePending.action,
+      id: shadePending.id,
+    });
+  }
+});
+
+async function shadeClick(action) {
+  const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const client = all.find(c => c.visibilityState === 'visible') || all[0];
+  if (client) {
+    if (action === 'start' || action === 'stop') {
+      shadePending = { action: action, id: ++shadeSeq };
+      client.postMessage({ type: 'shade-action', action: shadePending.action, id: shadePending.id });
+    } else {
+      try { await client.focus(); } catch (e) {}
+    }
+    return;
+  }
+  const url = new URL('./', self.registration.scope);
+  if (action === 'start' || action === 'stop') url.searchParams.set('shade', action);
+  try { await self.clients.openWindow(url.href); } catch (e) {}
+}
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;

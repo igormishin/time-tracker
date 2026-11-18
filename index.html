@@ -664,6 +664,7 @@ let state = {
   categories: [],
   entries: [],     // {id, catId, start, end}
   active: null,    // {id, catId, start}
+  lastCatId: null, // последняя запущенная категория — для кнопки «Старт» в шторке
   warnMinutes: 25,
 };
 
@@ -1034,6 +1035,7 @@ function closeActiveAtStartDayEnd() {
   renderGrid();
   if (currentTab === 'history') renderHistory();
   mutate({ op: 'update', table: 'entries', payload: { end_at: t }, where: { id: closing.id } });
+  shadeSync();
 }
 
 function stopActive() {
@@ -1065,6 +1067,7 @@ async function forceStopActive() {
     renderGrid();
     alert('Закрыто активных записей на сервере: ' + (count ?? '?'));
   } catch (e) { alert('Ошибка: ' + e.message); }
+  finally { shadeSync(); }
 }
 
 function tick() {
@@ -1082,6 +1085,7 @@ function tick() {
 
   // Live timeline tick
   if (currentTab === 'track' && Math.floor(ms / 1000) % 5 === 0) renderTimeline();
+  shadeOnTick();
 }
 
 /* ---------- Tracker actions ---------- */
@@ -1099,6 +1103,7 @@ function toggleCategory(catId) {
     state.entries.unshift({ id: closingId, catId: closingCat, start: closingStart, end: t });
     const newActive = wasSame ? null : { id: newId(), catId, start: t };
     state.active = newActive;
+    if (newActive) rememberCategory(catId);
     saveCache();
     renderGrid();
     mutate({ op: 'update', table: 'entries', payload: { end_at: t }, where: { id: closingId } });
@@ -1110,6 +1115,7 @@ function toggleCategory(catId) {
   } else {
     const id = newId();
     state.active = { id, catId, start: t };
+    rememberCategory(catId);
     saveCache();
     renderGrid();
     mutate({ op: 'insert', table: 'entries', payload: {
@@ -1117,6 +1123,8 @@ function toggleCategory(catId) {
     }});
   }
   if (currentTab === 'history') renderHistory();
+  shadeSync();
+  shadeMaybeAsk();
 }
 
 /* ---------- Stats ---------- */
@@ -1732,7 +1740,11 @@ function loadCache() {
     state.categories = c.categories || [];
     state.entries = c.entries || [];
     state.active = c.active || null;
+    state.lastCatId = c.lastCatId || null;
     state.warnMinutes = c.warnMinutes || 25;
+    if (!state.lastCatId) {
+      try { state.lastCatId = localStorage.getItem('tracker.lastCatId'); } catch (e) {}
+    }
     return state.categories.length > 0;
   } catch { return false; }
 }
@@ -1743,6 +1755,7 @@ function saveCache() {
       categories: state.categories,
       entries: state.entries.slice(0, 500),
       active: state.active,
+      lastCatId: state.lastCatId,
       warnMinutes: state.warnMinutes,
     }));
   } catch {}
@@ -1763,6 +1776,7 @@ async function applySession(s) {
       saveCache();
       renderGrid();
       setupRealtime();
+      shadeAfterReady();
       // Диагностика: если данные пустые — показываем баннер
       const diag = document.getElementById('diag-banner');
       if (diag) {
@@ -1780,6 +1794,7 @@ async function applySession(s) {
         // Кэш есть — показываем его, ошибку выводим как баннер
         diag.style.display = 'block';
         diag.textContent = 'Не удалось обновить: ' + (e.message || e);
+        shadeAfterReady();
       } else if (state.categories.length === 0) {
         // Нет ни кэша, ни данных — на гейт с ошибкой
         html.classList.remove('authed');
@@ -1794,8 +1809,14 @@ async function applySession(s) {
     state.categories.length = 0;
     state.entries.length = 0;
     state.active = null;
+    state.lastCatId = null;
     state.warnMinutes = 25;
-    try { localStorage.removeItem(CACHE_KEY); localStorage.removeItem(QUEUE_KEY); } catch {}
+    try {
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(QUEUE_KEY);
+      localStorage.removeItem('tracker.lastCatId');
+    } catch (e) {}
+    shadeDismissAll();
     queue.length = 0;
     updateQueueBadge();
   }
@@ -1887,6 +1908,11 @@ async function loadAll() {
     }
   });
   state.warnMinutes = settings.data?.warn_minutes || 25;
+  if (state.active) rememberCategory(state.active.catId);
+  else if (!state.lastCatId) {
+    const recent = state.entries.find(e => catById(e.catId));
+    if (recent) rememberCategory(recent.catId);
+  }
 }
 
 /* ---------- Offline-first mutation queue ---------- */
@@ -2008,7 +2034,9 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && session) {
     setupRealtime();
     syncSoon();
+    shadePull();
   }
+  shadeSync();
 });
 
 let realtimeWasOpen = false;
@@ -2052,6 +2080,7 @@ function syncSoon() {
     if (currentTab === 'track')   renderGrid();
     if (currentTab === 'stats')   renderStats();
     if (currentTab === 'history') renderHistory();
+    shadeSync();
   }, 300);
 }
 
@@ -2071,8 +2100,267 @@ window.clearQueue = () => { queue.length = 0; saveQueue(); };
 // потому что function declaration кладёт X на window и арроу вызывает сама себя.
 // Прямое присваивание ссылки решает проблему.
 
+/* ---------- Shade: шторка Android ----------
+   Обычное уведомление, без аудио: музыка не прерывается.
+   Идёт — категория, длительность и «Стоп». Стоит — «Старт» последней категории.
+*/
+let shadeReady = false;
+let shadeWasRunning = false;
+let shadeIdleDismissed = false;
+let shadeAsked = false;
+let shadeIcon = '';
+let shadeNoteSig = '';
+let shadeNoteGen = 0;
+let shadeSuppressClose = 0;
+let shadeSeenId = 0;
+let shadeQueued = null;
+let shadeIntentConsumed = false;
+
+function isAndroid() {
+  if (/Android/i.test(navigator.userAgent || '')) return true;
+  return !!(navigator.userAgentData && navigator.userAgentData.platform === 'Android');
+}
+
+function shadeDur(ms) {
+  const m = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  if (h > 0) return h + 'ч ' + mm + 'м';
+  if (m > 0) return m + 'м';
+  return 'только что';
+}
+
+function rememberCategory(catId) {
+  if (!catId || state.lastCatId === catId) return;
+  state.lastCatId = catId;
+  try { localStorage.setItem('tracker.lastCatId', catId); } catch (e) {}
+}
+
+function resolveLastCatId() {
+  let stored = null;
+  try { stored = localStorage.getItem('tracker.lastCatId'); } catch (e) {}
+  const list = [state.lastCatId, stored, state.active && state.active.catId];
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] && catById(list[i])) return list[i];
+  }
+  for (let i = 0; i < state.entries.length; i++) {
+    if (catById(state.entries[i].catId)) return state.entries[i].catId;
+  }
+  return (state.categories[0] && state.categories[0].id) || null;
+}
+
+function startLastCategory() {
+  const id = resolveLastCatId();
+  if (!id || !session || state.active) return;
+  toggleCategory(id);
+}
+
+function shadeMaybeAsk() {
+  if (!isAndroid() || !('Notification' in window)) return;
+  if (Notification.permission !== 'default' || shadeAsked) return;
+  shadeAsked = true;
+  try {
+    Notification.requestPermission().then(() => shadeSync()).catch(() => {});
+  } catch (e) {}
+}
+
+function shadeSuppress() {
+  shadeSuppressClose++;
+  setTimeout(() => { shadeSuppressClose = Math.max(0, shadeSuppressClose - 1); }, 800);
+}
+
+function shadeReg() {
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+  return navigator.serviceWorker.ready.catch(() => null);
+}
+
+function shadeCloseNote() {
+  shadeNoteSig = '';
+  shadeNoteGen++;
+  shadeSuppress();
+  shadeReg().then(reg => {
+    if (!reg) return;
+    return reg.getNotifications({ tag: 'tracker-shade' }).then(notes => {
+      notes.forEach(note => note.close());
+    });
+  }).catch(() => {});
+}
+
+function shadeNoteContent(mode) {
+  if (mode === 'running') {
+    if (!state.active) return null;
+    const cat = catById(state.active.catId);
+    if (!cat) return null;
+    const started = new Date(state.active.start);
+    return {
+      title: cat.name,
+      body: shadeDur(Date.now() - started.getTime()) + ' · с ' + fmtTime(started),
+      timestamp: started.getTime(),
+      actions: [{ action: 'stop', title: 'Стоп' }],
+    };
+  }
+  if (shadeIdleDismissed) return null;
+  const id = resolveLastCatId();
+  const cat = id && catById(id);
+  if (!cat) return null;
+  return {
+    title: cat.name,
+    body: 'Запустить снова',
+    timestamp: undefined,
+    actions: [{ action: 'start', title: 'Старт' }],
+  };
+}
+
+function shadeShowNote(mode) {
+  if (!shadeReady || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const content = shadeNoteContent(mode);
+  if (!content) return;
+  const sig = mode + '|' + content.title + '|' + content.body;
+  if (sig === shadeNoteSig) return;
+  shadeNoteSig = sig;
+  const gen = ++shadeNoteGen;
+  shadeSuppress();
+  shadeReg().then(reg => {
+    if (!reg) return;
+    const opts = {
+      data: { gen: gen, mode: mode },
+      body: content.body,
+      tag: 'tracker-shade',
+      lang: 'ru',
+      silent: true,
+      renotify: false,
+      requireInteraction: true,
+      icon: shadeIcon,
+      badge: shadeIcon,
+      actions: content.actions,
+    };
+    if (content.timestamp) opts.timestamp = content.timestamp;
+    return reg.showNotification(content.title, opts);
+  }).catch(() => { shadeNoteSig = ''; });
+}
+
+function shadeDismissAll() {
+  shadeIdleDismissed = true;
+  shadeWasRunning = false;
+  document.title = 'Time Tracker';
+  shadeCloseNote();
+}
+
+function shadeSync() {
+  if (!shadeReady) return;
+  if (!session) {
+    shadeDismissAll();
+    return;
+  }
+  if (state.active) {
+    rememberCategory(state.active.catId);
+    shadeWasRunning = true;
+    shadeIdleDismissed = false;
+    const cat = catById(state.active.catId);
+    if (cat) document.title = fmtClock(Date.now() - new Date(state.active.start).getTime()) + ' · ' + cat.name;
+    shadeShowNote('running');
+    return;
+  }
+  if (shadeWasRunning) {
+    shadeWasRunning = false;
+    shadeIdleDismissed = false;
+  }
+  document.title = 'Time Tracker';
+  shadeShowNote('idle');
+}
+
+function shadeOnTick() {
+  if (!shadeReady || !state.active) return;
+  const cat = catById(state.active.catId);
+  if (!cat) return;
+  document.title = fmtClock(Date.now() - new Date(state.active.start).getTime()) + ' · ' + cat.name;
+  shadeShowNote('running');
+}
+
+function shadeAck(id) {
+  try {
+    const controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (controller && id) controller.postMessage({ type: 'shade-ack', id: id });
+  } catch (e) {}
+}
+
+function shadeHandleAction(action, id) {
+  if (!session || !state.categories.length) {
+    shadeQueued = { action: action, id: id };
+    return;
+  }
+  if (id && id === shadeSeenId) {
+    shadeAck(id);
+    return;
+  }
+  if (id) shadeSeenId = id;
+  if (action === 'stop' && state.active) stopActive();
+  else if (action === 'start' && !state.active) startLastCategory();
+  shadeAck(id);
+}
+
+function shadeFlushQueued() {
+  if (!shadeQueued || !session || !state.categories.length) return;
+  const queued = shadeQueued;
+  shadeQueued = null;
+  shadeHandleAction(queued.action, queued.id);
+}
+
+function shadePull() {
+  try {
+    const controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (controller) controller.postMessage({ type: 'shade-pull' });
+  } catch (e) {}
+}
+
+function consumeShadeIntent() {
+  if (shadeIntentConsumed) return;
+  let action = null;
+  try {
+    const params = new URLSearchParams(location.search);
+    action = params.get('shade');
+    if (action) {
+      params.delete('shade');
+      const next = location.pathname + (params.toString() ? '?' + params : '') + location.hash;
+      history.replaceState(null, '', next);
+    }
+  } catch (e) {}
+  shadeIntentConsumed = true;
+  if (action === 'start' || action === 'stop') shadeHandleAction(action, null);
+}
+
+function shadeAfterReady() {
+  shadeFlushQueued();
+  shadePull();
+  consumeShadeIntent();
+  shadeSync();
+}
+
+function shadeInit() {
+  if (!isAndroid() || !('serviceWorker' in navigator) || !('Notification' in window)) return;
+  shadeReady = true;
+  shadeIcon = new URL('icons/app-icon-v3-192.png', document.baseURI).href;
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type === 'shade-action') {
+      shadeHandleAction(data.action, data.id);
+      return;
+    }
+    if (data.type === 'shade-closed') {
+      if (shadeSuppressClose) return;
+      if (typeof data.gen === 'number' && data.gen !== shadeNoteGen) return;
+      if (data.mode === 'running' && state.active) {
+        setTimeout(() => { if (state.active) shadeShowNote('running'); }, 600);
+      } else if (data.mode === 'idle') {
+        shadeIdleDismissed = true;
+      }
+    }
+  });
+}
+
 /* ---------- Boot ---------- */
 // Если есть кэш — показываем дашборд мгновенно, не дожидаясь сети
+shadeInit();
 if (document.documentElement.classList.contains('authed')) {
   if (loadCache()) renderGrid();
   updateQueueBadge();
