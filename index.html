@@ -2101,8 +2101,9 @@ window.clearQueue = () => { queue.length = 0; saveQueue(); };
 // Прямое присваивание ссылки решает проблему.
 
 /* ---------- Shade: шторка Android ----------
-   Обычное уведомление, без аудио: музыка не прерывается.
-   Идёт — категория, длительность и «Стоп». Стоит — «Старт» последней категории.
+   Кнопки веб-уведомления Android показывает только после разворота.
+   Поэтому само слово «Стоп» / «Старт» — это кнопка: тап по карточке
+   делает действие и не открывает приложение. Аудио нет, музыка не рвётся.
 */
 let shadeReady = false;
 let shadeWasRunning = false;
@@ -2193,8 +2194,8 @@ function shadeNoteContent(mode) {
     if (!cat) return null;
     const started = new Date(state.active.start);
     return {
-      title: cat.name,
-      body: shadeDur(Date.now() - started.getTime()) + ' · с ' + fmtTime(started),
+      title: 'Стоп',
+      body: cat.name + ' · ' + shadeDur(Date.now() - started.getTime()) + ' · с ' + fmtTime(started),
       timestamp: started.getTime(),
       actions: [{ action: 'stop', title: 'Стоп' }],
     };
@@ -2204,8 +2205,8 @@ function shadeNoteContent(mode) {
   const cat = id && catById(id);
   if (!cat) return null;
   return {
-    title: cat.name,
-    body: 'Запустить снова',
+    title: 'Старт',
+    body: cat.name,
     timestamp: undefined,
     actions: [{ action: 'start', title: 'Старт' }],
   };
@@ -2294,6 +2295,7 @@ function shadeHandleAction(action, id) {
     return;
   }
   if (id) shadeSeenId = id;
+  if (action === 'tap') action = state.active ? 'stop' : 'start';
   if (action === 'stop' && state.active) stopActive();
   else if (action === 'start' && !state.active) startLastCategory();
   shadeAck(id);
@@ -2326,7 +2328,7 @@ function consumeShadeIntent() {
     }
   } catch (e) {}
   shadeIntentConsumed = true;
-  if (action === 'start' || action === 'stop') shadeHandleAction(action, null);
+  if (action === 'start' || action === 'stop' || action === 'tap') shadeHandleAction(action, null);
 }
 
 function shadeAfterReady() {

@@ -2,7 +2,7 @@
 // Кеширует HTML/JS/иконки чтобы PWA запускалось без сети.
 // API запросы (Supabase) НЕ перехватываем — они идут напрямую.
 
-const CACHE = 'tracker-v10';
+const CACHE = 'tracker-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -33,7 +33,14 @@ let shadePending = null;
 let shadeSeq = 0;
 
 self.addEventListener('notificationclick', (event) => {
-  const action = event.action || '';
+  const data = event.notification && event.notification.data || {};
+  let action = event.action || '';
+  // В свёрнутой шторке кнопок не видно — тап по карточке и есть действие.
+  if (!action) {
+    if (data.mode === 'idle') action = 'start';
+    else if (data.mode === 'running') action = 'stop';
+    else action = 'tap';
+  }
   event.waitUntil(shadeClick(action));
 });
 
@@ -69,16 +76,14 @@ async function shadeClick(action) {
   const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   const client = all.find(c => c.visibilityState === 'visible') || all[0];
   if (client) {
-    if (action === 'start' || action === 'stop') {
+    if (action === 'start' || action === 'stop' || action === 'tap') {
       shadePending = { action: action, id: ++shadeSeq };
       client.postMessage({ type: 'shade-action', action: shadePending.action, id: shadePending.id });
-    } else {
-      try { await client.focus(); } catch (e) {}
     }
     return;
   }
   const url = new URL('./', self.registration.scope);
-  if (action === 'start' || action === 'stop') url.searchParams.set('shade', action);
+  if (action === 'start' || action === 'stop' || action === 'tap') url.searchParams.set('shade', action);
   try { await self.clients.openWindow(url.href); } catch (e) {}
 }
 
