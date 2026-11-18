@@ -2101,15 +2101,16 @@ window.clearQueue = () => { queue.length = 0; saveQueue(); };
 // Прямое присваивание ссылки решает проблему.
 
 /* ---------- Shade: шторка Android ----------
-   Кнопки веб-уведомления Android показывает только после разворота.
-   Поэтому само слово «Стоп» / «Старт» — это кнопка: тап по карточке
-   делает действие и не открывает приложение. Аудио нет, музыка не рвётся.
+   Крупный значок справа: пауза, пока таймер идёт, плей — когда стоит.
+   Тап по карточке делает это действие. Аудио нет, музыка не рвётся.
 */
 let shadeReady = false;
 let shadeWasRunning = false;
 let shadeIdleDismissed = false;
 let shadeAsked = false;
 let shadeIcon = '';
+let shadePauseIcon = '';
+let shadePlayIcon = '';
 let shadeNoteSig = '';
 let shadeNoteGen = 0;
 let shadeSuppressClose = 0;
@@ -2194,9 +2195,10 @@ function shadeNoteContent(mode) {
     if (!cat) return null;
     const started = new Date(state.active.start);
     return {
-      title: 'Стоп',
-      body: cat.name + ' · ' + shadeDur(Date.now() - started.getTime()) + ' · с ' + fmtTime(started),
+      title: cat.name,
+      body: shadeDur(Date.now() - started.getTime()) + ' · с ' + fmtTime(started),
       timestamp: started.getTime(),
+      icon: shadePauseIcon,
       actions: [{ action: 'stop', title: 'Стоп' }],
     };
   }
@@ -2205,9 +2207,10 @@ function shadeNoteContent(mode) {
   const cat = id && catById(id);
   if (!cat) return null;
   return {
-    title: 'Старт',
-    body: cat.name,
+    title: cat.name,
+    body: 'Запустить снова',
     timestamp: undefined,
+    icon: shadePlayIcon,
     actions: [{ action: 'start', title: 'Старт' }],
   };
 }
@@ -2231,7 +2234,7 @@ function shadeShowNote(mode) {
       silent: true,
       renotify: false,
       requireInteraction: true,
-      icon: shadeIcon,
+      icon: content.icon || shadeIcon,
       badge: shadeIcon,
       actions: content.actions,
     };
@@ -2342,6 +2345,8 @@ function shadeInit() {
   if (!isAndroid() || !('serviceWorker' in navigator) || !('Notification' in window)) return;
   shadeReady = true;
   shadeIcon = new URL('icons/app-icon-v3-192.png', document.baseURI).href;
+  shadePauseIcon = new URL('icons/shade-pause.png', document.baseURI).href;
+  shadePlayIcon = new URL('icons/shade-play.png', document.baseURI).href;
   navigator.serviceWorker.addEventListener('message', (event) => {
     const data = event.data || {};
     if (data.type === 'shade-action') {

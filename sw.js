@@ -2,7 +2,7 @@
 // Кеширует HTML/JS/иконки чтобы PWA запускалось без сети.
 // API запросы (Supabase) НЕ перехватываем — они идут напрямую.
 
-const CACHE = 'tracker-v11';
+const CACHE = 'tracker-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,8 @@ const ASSETS = [
   './icons/app-icon-v3-180.png',
   './icons/app-icon-v3-192.png',
   './icons/app-icon-v3-512.png',
+  './icons/shade-pause.png',
+  './icons/shade-play.png',
 ];
 
 self.addEventListener('install', (e) => {
